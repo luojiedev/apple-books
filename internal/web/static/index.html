@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>我的阅读记录</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="我的阅读记录首页">
+        <span class="brand-mark" aria-hidden="true">阅</span>
+        <span><strong>我的阅读记录</strong><small>Apple Books · 本地只读</small></span>
+      </a>
+      <a id="export-link" class="export-button" href="/api/export/books.csv">导出当前列表</a>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">阅读概览</p>
+          <h1>重新遇见读过的每一页</h1>
+          <p class="hero-copy">整理你的进度、高亮与笔记。所有内容只从本机数据库读取，不会上传。</p>
+        </div>
+        <div class="hero-orbit" aria-hidden="true"><span>书</span></div>
+      </section>
+
+      <section class="review-panel" aria-labelledby="review-title">
+        <div class="review-heading">
+          <div><p class="eyebrow">重新发现</p><h2 id="review-title">随机回顾</h2></div>
+          <div class="review-actions">
+            <label class="review-toggle"><input id="review-notes-only" type="checkbox"><span>仅看笔记</span></label>
+            <button id="new-review" type="button">换一条</button>
+          </div>
+        </div>
+        <div id="review-content" class="review-content" aria-live="polite">
+          <p class="review-loading">正在从旧时光里找一页…</p>
+        </div>
+      </section>
+
+      <section id="stats" class="stats" aria-label="阅读统计">
+        <button class="stat-card filter-card active" type="button" data-status-filter="all" aria-pressed="true" aria-label="查看全部藏书">
+          <span>藏书</span><strong data-stat="totalBooks">—</strong><small>本</small>
+        </button>
+        <button class="stat-card filter-card" type="button" data-status-filter="reading" aria-pressed="false" aria-label="查看阅读中的书籍">
+          <span>阅读中</span><strong data-stat="readingBooks">—</strong><small>本</small>
+        </button>
+        <button class="stat-card filter-card" type="button" data-status-filter="finished" aria-pressed="false" aria-label="查看已读完的书籍">
+          <span>已读完</span><strong data-stat="finishedBooks">—</strong><small>本</small>
+        </button>
+        <div class="stat-card"><span>高亮</span><strong data-stat="highlightCount">—</strong><small>条</small></div>
+        <div class="stat-card"><span>笔记</span><strong data-stat="noteCount">—</strong><small>条</small></div>
+      </section>
+
+      <section class="library-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">书库</p><h2>我的书库</h2></div>
+          <p id="result-count" class="result-count">正在载入…</p>
+        </div>
+
+        <form id="filters" class="filters" role="search">
+          <label class="search-field">
+            <span class="sr-only">搜索</span>
+            <input id="search" type="search" placeholder="搜索书名、作者或分类…" autocomplete="off">
+          </label>
+          <label><span class="sr-only">阅读状态</span><select id="status">
+            <option value="all">全部状态</option><option value="reading">阅读中</option>
+            <option value="finished">已读完</option><option value="unread">未开始</option>
+          </select></label>
+          <label><span class="sr-only">年份筛选</span><select id="year-filter">
+            <option value="">全部收集年份</option>
+          </select></label>
+          <label><span class="sr-only">排序</span><select id="sort">
+            <option value="recent">最近打开</option><option value="progress">阅读进度</option>
+            <option value="title">书名</option><option value="author">作者</option>
+          </select></label>
+        </form>
+        <p id="year-filter-hint" class="filter-hint">收集年份取数据库中购买、书库记录与创建日期的最早值，以减少迁移时间造成的偏差。</p>
+
+        <div id="book-grid" class="book-grid" aria-live="polite"></div>
+        <div id="empty-state" class="empty-state" hidden><span>⌕</span><h3>没有找到匹配的书</h3><p>换一个关键词或筛选条件试试。</p></div>
+        <nav class="pagination" aria-label="书库分页">
+          <button id="previous" type="button">上一页</button><span id="page-label"></span><button id="next" type="button">下一页</button>
+        </nav>
+      </section>
+
+      <aside class="data-note">
+        <strong>关于阅读时长</strong>
+        <p>Apple Books 数据库没有保存每本书的累计阅读时长，因此本工具不会展示推测性时长。当前可准确读取进度、最后打开时间及批注历史。</p>
+      </aside>
+    </main>
+  </div>
+
+  <dialog id="book-dialog" class="book-dialog">
+    <button id="dialog-close" class="dialog-close" aria-label="关闭">×</button>
+    <div id="dialog-content"></div>
+  </dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
