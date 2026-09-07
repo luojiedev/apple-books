@@ -16,6 +16,7 @@ The project focuses first on its most important job: giving you a complete, port
 - Browse the library by collection year and finished books by completion year
 - Sort by recently opened, reading progress, title, or author
 - Rediscover a random historical highlight, with an option to show only excerpts that include a personal note
+- Switch the interface between Chinese and English, with the preference remembered in the browser
 - Process everything locally without loading third-party resources in the page
 
 Apple Books does not store reliable cumulative reading time or a complete history of reading sessions, so this tool does not display estimated reading duration.

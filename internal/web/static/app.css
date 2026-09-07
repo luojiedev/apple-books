@@ -26,6 +26,14 @@ button, select { cursor: pointer; }
 .page-shell { max-width: 1320px; margin: 0 auto; padding: 0 36px 64px; }
 
 .topbar { height: 84px; display: flex; align-items: center; justify-content: space-between; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.language-switch { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: #ebebef; }
+.language-switch button {
+  min-width: 42px; border: 0; border-radius: 6px; padding: 6px 9px; color: var(--muted); background: transparent;
+  font-size: 11px; font-weight: 650; line-height: 1; transition: color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+.language-switch button[aria-pressed="true"] { color: var(--ink); background: var(--card); box-shadow: 0 1px 5px rgba(0, 0, 0, .08); }
+.language-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .brand { color: inherit; display: flex; align-items: center; gap: 12px; text-decoration: none; }
 .brand-mark {
   display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px;
@@ -122,6 +130,10 @@ h1 {
 .filters input:focus, .filters select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(230, 83, 50, .13); }
 .filter-hint { margin: 0 0 24px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 
+@media (min-width: 1051px) {
+  html[lang="en"] .filters { grid-template-columns: minmax(260px, 1fr) 160px 200px 180px; }
+}
+
 .book-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .book-card {
   min-height: 260px; border: 1px solid var(--line); border-radius: 16px; padding: 21px; background: var(--card);
@@ -200,6 +212,9 @@ h1 {
   .page-shell { padding: 0 16px 40px; }
   .topbar { height: 72px; }
   .brand small { display: none; }
+  .brand strong { max-width: 112px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar-actions { gap: 6px; }
+  .language-switch button { min-width: 34px; padding: 6px; }
   .export-button { padding: 9px 12px; font-size: 12px; }
   .hero { padding: 36px 24px; border-radius: 20px; }
   h1 { font-size: 38px; }

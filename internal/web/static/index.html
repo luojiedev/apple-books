@@ -4,97 +4,103 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
-  <title>我的阅读记录</title>
+  <title data-i18n="page.title">我的阅读记录</title>
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
   <div class="page-shell">
     <header class="topbar">
-      <a class="brand" href="/" aria-label="我的阅读记录首页">
-        <span class="brand-mark" aria-hidden="true">阅</span>
-        <span><strong>我的阅读记录</strong><small>Apple Books · 本地只读</small></span>
+      <a class="brand" href="/" aria-label="我的阅读记录首页" data-i18n-aria-label="brand.home">
+        <span class="brand-mark" aria-hidden="true" data-i18n="brand.mark">阅</span>
+        <span><strong data-i18n="brand.title">我的阅读记录</strong><small data-i18n="brand.subtitle">Apple Books · 本地只读</small></span>
       </a>
-      <a id="export-link" class="export-button" href="/api/export/books.csv">导出当前列表</a>
+      <div class="topbar-actions">
+        <div class="language-switch" role="group" aria-label="语言" data-i18n-aria-label="language.label">
+          <button type="button" data-language="zh-CN" aria-pressed="true">中文</button>
+          <button type="button" data-language="en" aria-pressed="false">EN</button>
+        </div>
+        <a id="export-link" class="export-button" href="/api/export/books.csv" data-i18n="export.list">导出当前列表</a>
+      </div>
     </header>
 
     <main>
       <section class="hero">
         <div>
-          <p class="eyebrow">阅读概览</p>
-          <h1>重新遇见读过的每一页</h1>
-          <p class="hero-copy">整理你的进度、高亮与笔记。所有内容只从本机数据库读取，不会上传。</p>
+          <p class="eyebrow" data-i18n="hero.eyebrow">阅读概览</p>
+          <h1 data-i18n="hero.title">重新遇见读过的每一页</h1>
+          <p class="hero-copy" data-i18n="hero.copy">整理你的进度、高亮与笔记。所有内容只从本机数据库读取，不会上传。</p>
         </div>
-        <div class="hero-orbit" aria-hidden="true"><span>书</span></div>
+        <div class="hero-orbit" aria-hidden="true"><span data-i18n="hero.mark">书</span></div>
       </section>
 
       <section class="review-panel" aria-labelledby="review-title">
         <div class="review-heading">
-          <div><p class="eyebrow">重新发现</p><h2 id="review-title">随机回顾</h2></div>
+          <div><p class="eyebrow" data-i18n="review.eyebrow">重新发现</p><h2 id="review-title" data-i18n="review.title">随机回顾</h2></div>
           <div class="review-actions">
-            <label class="review-toggle"><input id="review-notes-only" type="checkbox"><span>仅看笔记</span></label>
-            <button id="new-review" type="button">换一条</button>
+            <label class="review-toggle"><input id="review-notes-only" type="checkbox"><span data-i18n="review.notesOnly">仅看笔记</span></label>
+            <button id="new-review" type="button" data-i18n="review.next">换一条</button>
           </div>
         </div>
         <div id="review-content" class="review-content" aria-live="polite">
-          <p class="review-loading">正在从旧时光里找一页…</p>
+          <p class="review-loading" data-i18n="review.loading">正在从旧时光里找一页…</p>
         </div>
       </section>
 
-      <section id="stats" class="stats" aria-label="阅读统计">
-        <button class="stat-card filter-card active" type="button" data-status-filter="all" aria-pressed="true" aria-label="查看全部藏书">
-          <span>藏书</span><strong data-stat="totalBooks">—</strong><small>本</small>
+      <section id="stats" class="stats" aria-label="阅读统计" data-i18n-aria-label="stats.label">
+        <button class="stat-card filter-card active" type="button" data-status-filter="all" aria-pressed="true" aria-label="查看全部藏书" data-i18n-aria-label="stats.allLabel">
+          <span data-i18n="stats.library">藏书</span><strong data-stat="totalBooks">—</strong><small data-i18n="unit.books">本</small>
         </button>
-        <button class="stat-card filter-card" type="button" data-status-filter="reading" aria-pressed="false" aria-label="查看阅读中的书籍">
-          <span>阅读中</span><strong data-stat="readingBooks">—</strong><small>本</small>
+        <button class="stat-card filter-card" type="button" data-status-filter="reading" aria-pressed="false" aria-label="查看阅读中的书籍" data-i18n-aria-label="stats.readingLabel">
+          <span data-i18n="status.reading">阅读中</span><strong data-stat="readingBooks">—</strong><small data-i18n="unit.books">本</small>
         </button>
-        <button class="stat-card filter-card" type="button" data-status-filter="finished" aria-pressed="false" aria-label="查看已读完的书籍">
-          <span>已读完</span><strong data-stat="finishedBooks">—</strong><small>本</small>
+        <button class="stat-card filter-card" type="button" data-status-filter="finished" aria-pressed="false" aria-label="查看已读完的书籍" data-i18n-aria-label="stats.finishedLabel">
+          <span data-i18n="status.finished">已读完</span><strong data-stat="finishedBooks">—</strong><small data-i18n="unit.books">本</small>
         </button>
-        <div class="stat-card"><span>高亮</span><strong data-stat="highlightCount">—</strong><small>条</small></div>
-        <div class="stat-card"><span>笔记</span><strong data-stat="noteCount">—</strong><small>条</small></div>
+        <div class="stat-card"><span data-i18n="annotation.highlight">高亮</span><strong data-stat="highlightCount">—</strong><small data-i18n="unit.items">条</small></div>
+        <div class="stat-card"><span data-i18n="annotation.note">笔记</span><strong data-stat="noteCount">—</strong><small data-i18n="unit.items">条</small></div>
       </section>
 
       <section class="library-section">
         <div class="section-heading">
-          <div><p class="eyebrow">书库</p><h2>我的书库</h2></div>
-          <p id="result-count" class="result-count">正在载入…</p>
+          <div><p class="eyebrow" data-i18n="library.eyebrow">书库</p><h2 data-i18n="library.title">我的书库</h2></div>
+          <p id="result-count" class="result-count" data-i18n="common.loading">正在载入…</p>
         </div>
 
         <form id="filters" class="filters" role="search">
           <label class="search-field">
-            <span class="sr-only">搜索</span>
-            <input id="search" type="search" placeholder="搜索书名、作者或分类…" autocomplete="off">
+            <span class="sr-only" data-i18n="search.label">搜索</span>
+            <input id="search" type="search" placeholder="搜索书名、作者或分类…" data-i18n-placeholder="search.placeholder" autocomplete="off">
           </label>
-          <label><span class="sr-only">阅读状态</span><select id="status">
-            <option value="all">全部状态</option><option value="reading">阅读中</option>
-            <option value="finished">已读完</option><option value="unread">未开始</option>
+          <label><span class="sr-only" data-i18n="filter.status">阅读状态</span><select id="status">
+            <option value="all" data-i18n="status.all">全部状态</option><option value="reading" data-i18n="status.reading">阅读中</option>
+            <option value="finished" data-i18n="status.finished">已读完</option><option value="unread" data-i18n="status.unread">未开始</option>
           </select></label>
-          <label><span class="sr-only">年份筛选</span><select id="year-filter">
-            <option value="">全部收集年份</option>
+          <label><span class="sr-only" data-i18n="filter.year">年份筛选</span><select id="year-filter">
+            <option value="" data-i18n="year.allCollected">全部收集年份</option>
           </select></label>
-          <label><span class="sr-only">排序</span><select id="sort">
-            <option value="recent">最近打开</option><option value="progress">阅读进度</option>
-            <option value="title">书名</option><option value="author">作者</option>
+          <label><span class="sr-only" data-i18n="filter.sort">排序</span><select id="sort">
+            <option value="recent" data-i18n="sort.recent">最近打开</option><option value="progress" data-i18n="sort.progress">阅读进度</option>
+            <option value="title" data-i18n="sort.title">书名</option><option value="author" data-i18n="sort.author">作者</option>
           </select></label>
         </form>
-        <p id="year-filter-hint" class="filter-hint">收集年份取数据库中购买、书库记录与创建日期的最早值，以减少迁移时间造成的偏差。</p>
+        <p id="year-filter-hint" class="filter-hint" data-i18n="year.collectionHint">收集年份取数据库中购买、书库记录与创建日期的最早值，以减少迁移时间造成的偏差。</p>
 
         <div id="book-grid" class="book-grid" aria-live="polite"></div>
-        <div id="empty-state" class="empty-state" hidden><span>⌕</span><h3>没有找到匹配的书</h3><p>换一个关键词或筛选条件试试。</p></div>
-        <nav class="pagination" aria-label="书库分页">
-          <button id="previous" type="button">上一页</button><span id="page-label"></span><button id="next" type="button">下一页</button>
+        <div id="empty-state" class="empty-state" hidden><span>⌕</span><h3 data-i18n="empty.title">没有找到匹配的书</h3><p data-i18n="empty.copy">换一个关键词或筛选条件试试。</p></div>
+        <nav class="pagination" aria-label="书库分页" data-i18n-aria-label="pagination.label">
+          <button id="previous" type="button" data-i18n="pagination.previous">上一页</button><span id="page-label"></span><button id="next" type="button" data-i18n="pagination.next">下一页</button>
         </nav>
       </section>
 
       <aside class="data-note">
-        <strong>关于阅读时长</strong>
-        <p>Apple Books 数据库没有保存每本书的累计阅读时长，因此本工具不会展示推测性时长。当前可准确读取进度、最后打开时间及批注历史。</p>
+        <strong data-i18n="duration.title">关于阅读时长</strong>
+        <p data-i18n="duration.copy">Apple Books 数据库没有保存每本书的累计阅读时长，因此本工具不会展示推测性时长。当前可准确读取进度、最后打开时间及批注历史。</p>
       </aside>
     </main>
   </div>
 
   <dialog id="book-dialog" class="book-dialog">
-    <button id="dialog-close" class="dialog-close" aria-label="关闭">×</button>
+    <button id="dialog-close" class="dialog-close" aria-label="关闭" data-i18n-aria-label="common.close">×</button>
     <div id="dialog-content"></div>
   </dialog>
   <div id="toast" class="toast" role="status" hidden></div>
