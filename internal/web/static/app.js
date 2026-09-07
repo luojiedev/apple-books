@@ -214,7 +214,10 @@ function renderBookDetail(book, annotations) {
         ${annotation.note ? `<p class="annotation-note">笔记：${escapeHTML(annotation.note)}</p>` : ''}
         <p class="annotation-time">${annotationTypeText(annotation)} · ${formatDate(annotation.createdAt)}</p>
       </article>`).join('')
-    : '<p class="book-author">这本书暂时没有高亮、笔记或书签。</p>';
+    : `<div class="annotation-empty" role="status">
+        <strong>本机暂未发现这本书的高亮或笔记</strong>
+        <p>书籍显示在书库中，并不代表其批注已经从 iCloud 同步到本机。如果这本书尚未下载，请先在 Apple Books 中下载并打开一次，等待同步完成后，再返回此处刷新页面。若仍未显示，请重启本工具后重试。</p>
+      </div>`;
   elements.dialogContent.innerHTML = `
     <header class="detail-header">
       <p class="eyebrow">${statusText(book.status)}</p>

@@ -169,6 +169,9 @@ h1 {
 .detail-description { padding: 24px 52px 0; color: var(--muted); line-height: 1.75; font-size: 13px; }
 .annotations { padding: 30px 52px 52px; }
 .annotations h3 { font-size: 22px; margin: 0 0 18px; }
+.annotation-empty { padding: 18px 20px; border: 1px solid #efd8ae; border-radius: 12px; background: #fffaf0; }
+.annotation-empty strong { display: block; font-size: 14px; }
+.annotation-empty p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .annotation { border-top: 1px solid var(--line); padding: 20px 0; }
 .annotation:first-of-type { border-top: 0; }
 .annotation blockquote { margin: 0; font-size: 16px; line-height: 1.75; }
