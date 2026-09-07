@@ -1,5 +1,7 @@
 # Apple Books 阅读记录
 
+**简体中文** · [English](README_EN.md)
+
 一个在本机读取 Apple Books 数据的阅读档案与导出工具。它不会修改 Apple Books 数据库，也不会上传书籍、划线或笔记。
 
 这个项目首先解决一件最重要的事：把属于你的阅读数据完整地带出 Apple Books。
