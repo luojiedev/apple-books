@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">My Reading Archive</title>
+  <defs>
+    <linearGradient id="background" x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F06B49"/>
+      <stop offset="1" stop-color="#D94728"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#background)"/>
+  <path d="M31.75 26.25C26.68 21.93 20.38 20.25 14 21.75V44.5c6.35-1.48 12.62.22 17.75 4.75v-23Z" fill="#FFF"/>
+  <path d="M32.25 26.25c5.07-4.32 11.37-6 17.75-4.5V44.5c-6.35-1.48-12.62.22-17.75 4.75v-23Z" fill="#FFF"/>
+  <path d="M39 18.25h8v15l-4-3-4 3v-15Z" fill="#214C40"/>
+  <path d="M31.75 26.25v23" stroke="#F5C0B2" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

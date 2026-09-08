@@ -81,6 +81,17 @@ func TestParseBookQueryRejectsUnsupportedStatus(t *testing.T) {
 	}
 }
 
+func TestParsePagination(t *testing.T) {
+	request := httptest.NewRequest("GET", "/api/want-to-read?limit=16&offset=32", nil)
+	limit, offset, err := parsePagination(request, 24)
+	if err != nil {
+		t.Fatalf("parsePagination() error = %v", err)
+	}
+	if limit != 16 || offset != 32 {
+		t.Fatalf("pagination = (%d, %d), want (16, 32)", limit, offset)
+	}
+}
+
 func TestParseAnnotationQuery(t *testing.T) {
 	request := httptest.NewRequest("GET", "/api/annotations?q=%E6%91%98%E5%BD%95&kind=note&style=3&limit=12&offset=24", nil)
 	query, err := parseAnnotationQuery(request)

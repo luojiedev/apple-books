@@ -19,6 +19,7 @@ import (
 )
 
 const appleEpochOffset = 978307200
+const wantToReadCollectionID = "Want_To_Read_Collection_ID"
 
 type Store struct {
 	library    *sql.DB
@@ -69,6 +70,8 @@ func (s *Store) validateSchema(ctx context.Context) error {
 		table    string
 	}{
 		{s.library, "ZBKLIBRARYASSET"},
+		{s.library, "ZBKCOLLECTION"},
+		{s.library, "ZBKCOLLECTIONMEMBER"},
 		{s.annotation, "ZAEANNOTATION"},
 	}
 	for _, check := range checks {
@@ -252,6 +255,49 @@ func (s *Store) Books(ctx context.Context, query domain.BookQuery) (domain.BookP
 		return domain.BookPage{}, err
 	}
 	return domain.BookPage{Items: books, Total: total, Limit: query.Limit, Offset: query.Offset}, nil
+}
+
+func (s *Store) WantToRead(ctx context.Context, limit, offset int) (domain.BookPage, error) {
+	const collectionJoins = `
+		FROM ZBKLIBRARYASSET AS asset
+		JOIN ZBKCOLLECTIONMEMBER AS member ON member.ZASSET = asset.Z_PK
+		JOIN ZBKCOLLECTION AS collection ON collection.Z_PK = member.ZCOLLECTION
+		WHERE collection.ZCOLLECTIONID = ?`
+
+	var total int64
+	if err := s.library.QueryRowContext(ctx, "SELECT COUNT(*) "+collectionJoins, wantToReadCollectionID).Scan(&total); err != nil {
+		return domain.BookPage{}, fmt.Errorf("count want-to-read books: %w", err)
+	}
+
+	rows, err := s.library.QueryContext(ctx, `
+		SELECT asset.Z_PK, COALESCE(asset.ZASSETID, ''), COALESCE(asset.ZTITLE, ''), COALESCE(asset.ZAUTHOR, ''),
+		       COALESCE(asset.ZGENRE, ''), COALESCE(asset.ZLANGUAGE, ''), COALESCE(asset.ZBOOKDESCRIPTION, ''),
+		       COALESCE(asset.ZREADINGPROGRESS, 0), COALESCE(asset.ZISFINISHED, 0),
+		       asset.ZLASTOPENDATE, asset.ZLASTENGAGEDDATE, asset.ZDATEFINISHED, COALESCE(asset.ZPAGECOUNT, 0),
+		       asset.ZPURCHASEDATE, asset.ZUPDATEDATE, asset.ZCREATIONDATE, COALESCE(asset.ZPATH, '')
+		`+collectionJoins+`
+		ORDER BY member.ZSORTKEY, member.Z_PK
+		LIMIT ? OFFSET ?`, wantToReadCollectionID, limit, offset)
+	if err != nil {
+		return domain.BookPage{}, fmt.Errorf("query want-to-read books: %w", err)
+	}
+	defer rows.Close()
+
+	books := make([]domain.Book, 0, limit)
+	for rows.Next() {
+		book, err := scanBook(rows)
+		if err != nil {
+			return domain.BookPage{}, err
+		}
+		books = append(books, book)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.BookPage{}, fmt.Errorf("iterate want-to-read books: %w", err)
+	}
+	if err := s.addAnnotationCounts(ctx, books); err != nil {
+		return domain.BookPage{}, err
+	}
+	return domain.BookPage{Items: books, Total: total, Limit: limit, Offset: offset}, nil
 }
 
 func bookFilters(query domain.BookQuery) (string, []any) {

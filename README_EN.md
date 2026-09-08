@@ -17,6 +17,8 @@ The project focuses first on its most important job: giving you a complete, port
 - Sort by recently opened, reading progress, title, or author
 - Rediscover a random historical highlight, with an option to show only excerpts that include a personal note
 - Search highlight text and notes across the library, with annotation-type and highlight-color filters
+- Browse the Apple Books Want to Read collection below annotation search
+- Set independent page sizes for annotations, Want to Read, and the library, with choices remembered in the browser
 - Generate annual reports covering collected and finished books, annotation days, monthly activity, and most-annotated books
 - Pick the next book from unread, stalled, or all books with the book picker
 - Restore Apple Books highlight colors in annotation lists and book details

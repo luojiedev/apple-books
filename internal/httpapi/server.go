@@ -37,6 +37,7 @@ func New(reader store.Reader) (*Server, error) {
 	mux.HandleFunc("GET /api/review/random", server.randomReview)
 	mux.HandleFunc("GET /api/books/pick", server.randomBook)
 	mux.HandleFunc("GET /api/books", server.books)
+	mux.HandleFunc("GET /api/want-to-read", server.wantToRead)
 	mux.HandleFunc("GET /api/annotations", server.searchAnnotations)
 	mux.HandleFunc("GET /api/reports/year", server.yearReport)
 	mux.HandleFunc("GET /api/books/{id}", server.book)
@@ -159,6 +160,21 @@ func (s *Server) books(response http.ResponseWriter, request *http.Request) {
 	writeJSON(response, http.StatusOK, page)
 }
 
+func (s *Server) wantToRead(response http.ResponseWriter, request *http.Request) {
+	limit, offset, err := parsePagination(request, 24)
+	if err != nil {
+		writeClientError(response, err.Error())
+		return
+	}
+	page, err := s.reader.WantToRead(request.Context(), limit, offset)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	log.Debug("want-to-read collection loaded", "total", page.Total, "limit", limit, "offset", offset)
+	writeJSON(response, http.StatusOK, page)
+}
+
 func (s *Server) book(response http.ResponseWriter, request *http.Request) {
 	id, err := parseID(request.PathValue("id"))
 	if err != nil {
@@ -245,13 +261,9 @@ func (s *Server) exportBooks(response http.ResponseWriter, request *http.Request
 
 func parseBookQuery(request *http.Request) (domain.BookQuery, error) {
 	values := request.URL.Query()
-	limit, err := boundedInt(values.Get("limit"), 24, 1, 100)
+	limit, offset, err := parsePagination(request, 24)
 	if err != nil {
-		return domain.BookQuery{}, fmt.Errorf("limit 必须是 1 到 100 之间的整数")
-	}
-	offset, err := boundedInt(values.Get("offset"), 0, 0, 1_000_000)
-	if err != nil {
-		return domain.BookQuery{}, fmt.Errorf("offset 必须是非负整数")
+		return domain.BookQuery{}, err
 	}
 	status := values.Get("status")
 	if status != "" && status != "all" && status != "unread" && status != "reading" && status != "finished" {
@@ -276,6 +288,19 @@ func parseBookQuery(request *http.Request) (domain.BookQuery, error) {
 		Search: strings.TrimSpace(values.Get("q")), Status: status, Sort: sort,
 		FinishedYear: finishedYear, CollectionYear: collectionYear, Limit: limit, Offset: offset,
 	}, nil
+}
+
+func parsePagination(request *http.Request, defaultLimit int) (int, int, error) {
+	values := request.URL.Query()
+	limit, err := boundedInt(values.Get("limit"), defaultLimit, 1, 100)
+	if err != nil {
+		return 0, 0, fmt.Errorf("limit 必须是 1 到 100 之间的整数")
+	}
+	offset, err := boundedInt(values.Get("offset"), 0, 0, 1_000_000)
+	if err != nil {
+		return 0, 0, fmt.Errorf("offset 必须是非负整数")
+	}
+	return limit, offset, nil
 }
 
 func parseAnnotationQuery(request *http.Request) (domain.AnnotationQuery, error) {

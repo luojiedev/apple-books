@@ -1,12 +1,15 @@
 const state = {
-  limit: 24,
+  limit: savedPageSize('library', 12, [4, 8, 12, 24, 48]),
   offset: 0,
   total: 0,
   searchTimer: null,
-  annotationLimit: 12,
+  annotationLimit: savedPageSize('annotations', 6, [3, 6, 12, 24]),
   annotationOffset: 0,
   annotationTotal: 0,
   annotationSearchTimer: null,
+  wantToReadLimit: savedPageSize('want-to-read', 8, [4, 8, 12, 24]),
+  wantToReadOffset: 0,
+  wantToReadTotal: 0,
   finishedYears: [],
   collectionYears: [],
   bookDetail: null,
@@ -18,7 +21,6 @@ const translations = {
     'page.title': '我的阅读记录',
     'language.label': '语言',
     'brand.home': '我的阅读记录首页',
-    'brand.mark': '阅',
     'brand.title': '我的阅读记录',
     'brand.subtitle': 'Apple Books · 本地只读',
     'export.list': '导出列表',
@@ -65,6 +67,14 @@ const translations = {
     'annotationSearch.count': '共 {count} 条',
     'annotationSearch.empty': '没有找到匹配的批注',
     'annotationSearch.paginationLabel': '批注分页',
+    'annotationSearch.pageSizeLabel': '批注每页数量',
+    'pagination.pageSize': '每页',
+    'wantToRead.eyebrow': '待读书架',
+    'wantToRead.title': '欲读清单',
+    'wantToRead.count': '共 {count} 本',
+    'wantToRead.empty': '欲读清单还是空的',
+    'wantToRead.paginationLabel': '欲读清单分页',
+    'wantToRead.pageSizeLabel': '欲读清单每页数量',
     'style.none': '下划线',
     'style.green': '绿色',
     'style.blue': '蓝色',
@@ -85,6 +95,7 @@ const translations = {
     'annotation.mark': '标记',
     'library.eyebrow': '书库',
     'library.title': '我的书库',
+    'library.pageSizeLabel': '书库每页数量',
     'common.loading': '正在载入…',
     'common.close': '关闭',
     'search.label': '搜索',
@@ -142,7 +153,6 @@ const translations = {
     'page.title': 'My Reading Archive',
     'language.label': 'Language',
     'brand.home': 'My Reading Archive home',
-    'brand.mark': 'R',
     'brand.title': 'My Reading Archive',
     'brand.subtitle': 'Apple Books · Local, read-only',
     'export.list': 'Export CSV',
@@ -189,6 +199,14 @@ const translations = {
     'annotationSearch.count': '{count} items',
     'annotationSearch.empty': 'No matching annotations',
     'annotationSearch.paginationLabel': 'Annotation pages',
+    'annotationSearch.pageSizeLabel': 'Annotations per page',
+    'pagination.pageSize': 'Per page',
+    'wantToRead.eyebrow': 'READING QUEUE',
+    'wantToRead.title': 'Want to Read',
+    'wantToRead.count': '{count} books',
+    'wantToRead.empty': 'Your Want to Read collection is empty',
+    'wantToRead.paginationLabel': 'Want to Read pages',
+    'wantToRead.pageSizeLabel': 'Want to Read books per page',
     'style.none': 'Underline',
     'style.green': 'Green',
     'style.blue': 'Blue',
@@ -209,6 +227,7 @@ const translations = {
     'annotation.mark': 'Mark',
     'library.eyebrow': 'LIBRARY',
     'library.title': 'My Library',
+    'library.pageSizeLabel': 'Library books per page',
     'common.loading': 'Loading…',
     'common.close': 'Close',
     'search.label': 'Search',
@@ -268,6 +287,7 @@ const elements = {
   grid: document.querySelector('#book-grid'),
   empty: document.querySelector('#empty-state'),
   count: document.querySelector('#result-count'),
+  libraryPageSize: document.querySelector('#library-page-size'),
   search: document.querySelector('#search'),
   status: document.querySelector('#status'),
   yearFilter: document.querySelector('#year-filter'),
@@ -294,6 +314,14 @@ const elements = {
   annotationPrevious: document.querySelector('#annotation-previous'),
   annotationNext: document.querySelector('#annotation-next'),
   annotationPageLabel: document.querySelector('#annotation-page-label'),
+  annotationPageSize: document.querySelector('#annotation-page-size'),
+  wantToReadGrid: document.querySelector('#want-to-read-grid'),
+  wantToReadEmpty: document.querySelector('#want-to-read-empty'),
+  wantToReadCount: document.querySelector('#want-to-read-count'),
+  wantToReadPrevious: document.querySelector('#want-to-read-previous'),
+  wantToReadNext: document.querySelector('#want-to-read-next'),
+  wantToReadPageLabel: document.querySelector('#want-to-read-page-label'),
+  wantToReadPageSize: document.querySelector('#want-to-read-page-size'),
   dialog: document.querySelector('#book-dialog'),
   dialogContent: document.querySelector('#dialog-content'),
   toast: document.querySelector('#toast'),
@@ -339,6 +367,30 @@ function saveLanguage(language) {
   } catch (_) {
     // Keep the selection for this page even when local storage is unavailable.
   }
+}
+
+function savedPageSize(section, fallback, allowedValues) {
+  try {
+    const value = Number(window.localStorage.getItem(`apple-books-page-size-${section}`));
+    if (allowedValues.includes(value)) return value;
+  } catch (_) {
+    // Use the compact default when local storage is unavailable.
+  }
+  return fallback;
+}
+
+function savePageSize(section, value) {
+  try {
+    window.localStorage.setItem(`apple-books-page-size-${section}`, String(value));
+  } catch (_) {
+    // Keep the selection for this page even when local storage is unavailable.
+  }
+}
+
+function initializePageSizes() {
+  elements.libraryPageSize.value = String(state.limit);
+  elements.annotationPageSize.value = String(state.annotationLimit);
+  elements.wantToReadPageSize.value = String(state.wantToReadLimit);
 }
 
 async function requestJSON(url) {
@@ -564,6 +616,30 @@ function updateAnnotationPagination() {
   elements.annotationNext.disabled = state.annotationOffset + state.annotationLimit >= state.annotationTotal;
 }
 
+async function loadWantToRead() {
+  elements.wantToReadGrid.innerHTML = `<div class="loading">${t('books.loading')}</div>`;
+  elements.wantToReadEmpty.hidden = true;
+  const params = new URLSearchParams({ limit: state.wantToReadLimit, offset: state.wantToReadOffset });
+  try {
+    const page = await requestJSON(`/api/want-to-read?${params}`);
+    state.wantToReadTotal = page.total;
+    renderBookCards(page.items, elements.wantToReadGrid, elements.wantToReadEmpty);
+    updateWantToReadPagination();
+    elements.wantToReadCount.textContent = t('wantToRead.count', { count: page.total.toLocaleString(displayLocale()) });
+  } catch (error) {
+    elements.wantToReadGrid.innerHTML = '';
+    showToast(error.message);
+  }
+}
+
+function updateWantToReadPagination() {
+  const page = Math.floor(state.wantToReadOffset / state.wantToReadLimit) + 1;
+  const pages = Math.max(1, Math.ceil(state.wantToReadTotal / state.wantToReadLimit));
+  elements.wantToReadPageLabel.textContent = `${page} / ${pages}`;
+  elements.wantToReadPrevious.disabled = state.wantToReadOffset === 0;
+  elements.wantToReadNext.disabled = state.wantToReadOffset + state.wantToReadLimit >= state.wantToReadTotal;
+}
+
 async function loadBooks() {
   elements.grid.innerHTML = `<div class="loading">${t('books.loading')}</div>`;
   elements.empty.hidden = true;
@@ -581,8 +657,12 @@ async function loadBooks() {
 }
 
 function renderBooks(books) {
-  elements.grid.innerHTML = '';
-  elements.empty.hidden = books.length > 0;
+  renderBookCards(books, elements.grid, elements.empty);
+}
+
+function renderBookCards(books, container, emptyState) {
+  container.innerHTML = '';
+  emptyState.hidden = books.length > 0;
   books.forEach((book) => {
     const card = document.createElement('article');
     card.className = 'book-card';
@@ -602,7 +682,7 @@ function renderBooks(books) {
     card.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openBook(book.id); }
     });
-    elements.grid.append(card);
+    container.append(card);
   });
 }
 
@@ -725,7 +805,7 @@ function changeLanguage(language) {
   if (elements.dialog.open && state.bookDetail) {
     renderBookDetail(state.bookDetail.book, state.bookDetail.annotations);
   }
-  Promise.all([loadSummary().then(loadYearReport), loadReview(), loadBooks(), loadAnnotations()]).catch((error) => showToast(error.message));
+  Promise.all([loadSummary().then(loadYearReport), loadReview(), loadBooks(), loadAnnotations(), loadWantToRead()]).catch((error) => showToast(error.message));
 }
 
 function closeBookDialog() {
@@ -761,6 +841,12 @@ elements.annotationSearch.addEventListener('input', () => {
 });
 elements.annotationKind.addEventListener('change', () => { state.annotationOffset = 0; loadAnnotations(); });
 elements.annotationStyle.addEventListener('change', () => { state.annotationOffset = 0; loadAnnotations(); });
+elements.annotationPageSize.addEventListener('change', () => {
+  state.annotationLimit = Number(elements.annotationPageSize.value);
+  state.annotationOffset = 0;
+  savePageSize('annotations', state.annotationLimit);
+  loadAnnotations();
+});
 elements.annotationPrevious.addEventListener('click', () => {
   state.annotationOffset = Math.max(0, state.annotationOffset - state.annotationLimit);
   loadAnnotations();
@@ -771,12 +857,36 @@ elements.annotationNext.addEventListener('click', () => {
   loadAnnotations();
   document.querySelector('.annotation-search-section').scrollIntoView({ behavior: 'smooth' });
 });
+elements.wantToReadPrevious.addEventListener('click', () => {
+  state.wantToReadOffset = Math.max(0, state.wantToReadOffset - state.wantToReadLimit);
+  loadWantToRead();
+  scrollToWantToRead();
+});
+elements.wantToReadNext.addEventListener('click', () => {
+  state.wantToReadOffset += state.wantToReadLimit;
+  loadWantToRead();
+  scrollToWantToRead();
+});
+elements.wantToReadPageSize.addEventListener('change', () => {
+  state.wantToReadLimit = Number(elements.wantToReadPageSize.value);
+  state.wantToReadOffset = 0;
+  savePageSize('want-to-read', state.wantToReadLimit);
+  loadWantToRead();
+});
+elements.libraryPageSize.addEventListener('change', () => {
+  state.limit = Number(elements.libraryPageSize.value);
+  state.offset = 0;
+  savePageSize('library', state.limit);
+  loadBooks();
+});
 elements.previous.addEventListener('click', () => { state.offset = Math.max(0, state.offset - state.limit); loadBooks(); scrollToLibrary(); });
 elements.next.addEventListener('click', () => { state.offset += state.limit; loadBooks(); scrollToLibrary(); });
 document.querySelector('#dialog-close').addEventListener('click', closeBookDialog);
 elements.dialog.addEventListener('click', (event) => { if (event.target === elements.dialog) closeBookDialog(); });
 
 function scrollToLibrary() { document.querySelector('.library-section').scrollIntoView({ behavior: 'smooth' }); }
+function scrollToWantToRead() { document.querySelector('.want-to-read-section').scrollIntoView({ behavior: 'smooth' }); }
 
+initializePageSizes();
 applyStaticTranslations();
-Promise.all([loadSummary().then(loadYearReport), loadReview(), loadBooks(), loadAnnotations()]).catch((error) => showToast(error.message));
+Promise.all([loadSummary().then(loadYearReport), loadReview(), loadBooks(), loadAnnotations(), loadWantToRead()]).catch((error) => showToast(error.message));

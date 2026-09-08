@@ -100,6 +100,17 @@ func TestStoreReadsBooksAndUserAnnotations(t *testing.T) {
 		t.Fatalf("unexpected collection year page: %+v", collectionPage)
 	}
 
+	wantToReadPage, err := reader.WantToRead(context.Background(), 10, 0)
+	if err != nil {
+		t.Fatalf("WantToRead() error = %v", err)
+	}
+	if wantToReadPage.Total != 1 || len(wantToReadPage.Items) != 1 || wantToReadPage.Items[0].Title != "测试书" {
+		t.Fatalf("unexpected want-to-read page: %+v", wantToReadPage)
+	}
+	if wantToReadPage.Items[0].AnnotationCount != 1 {
+		t.Fatalf("want-to-read annotation count = %d, want 1", wantToReadPage.Items[0].AnnotationCount)
+	}
+
 	annotations, err := reader.Annotations(context.Background(), "asset-1")
 	if err != nil {
 		t.Fatalf("Annotations() error = %v", err)
@@ -171,6 +182,14 @@ func createLibraryFixture(t *testing.T, path string) {
 	mustExec(t, database, `INSERT INTO ZBKLIBRARYASSET VALUES
 		(1, 'asset-1', '测试书', '作者甲', '文学', 'zh', '简介', 0.5, 0, 800000000, 800000000, NULL, 200, 800000000, 800000050, 650000000, '/books/test.epub'),
 		(2, 'asset-2', '读完的书', '作者乙', '', 'zh', '', 0.9, 1, 700000000, NULL, 700000100, 0, NULL, 700000000, NULL, '')`)
+	mustExec(t, database, `CREATE TABLE ZBKCOLLECTION (
+		Z_PK INTEGER PRIMARY KEY, ZCOLLECTIONID TEXT
+	)`)
+	mustExec(t, database, `CREATE TABLE ZBKCOLLECTIONMEMBER (
+		Z_PK INTEGER PRIMARY KEY, ZSORTKEY INTEGER, ZASSET INTEGER, ZCOLLECTION INTEGER
+	)`)
+	mustExec(t, database, `INSERT INTO ZBKCOLLECTION VALUES (1, 'Want_To_Read_Collection_ID')`)
+	mustExec(t, database, `INSERT INTO ZBKCOLLECTIONMEMBER VALUES (1, 10000, 1, 1)`)
 }
 
 func createAnnotationFixture(t *testing.T, path string) {

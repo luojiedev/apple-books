@@ -4,14 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#e65332">
   <title data-i18n="page.title">我的阅读记录</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any">
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
   <div class="page-shell">
     <header class="topbar">
       <a class="brand" href="/" aria-label="我的阅读记录首页" data-i18n-aria-label="brand.home">
-        <span class="brand-mark" aria-hidden="true" data-i18n="brand.mark">阅</span>
+        <img class="brand-mark" src="/favicon.svg" alt="" width="40" height="40">
         <span><strong data-i18n="brand.title">我的阅读记录</strong><small data-i18n="brand.subtitle">Apple Books · 本地只读</small></span>
       </a>
       <div class="topbar-actions">
@@ -26,22 +28,20 @@
     <main>
       <section class="hero">
         <div>
-          <p class="eyebrow" data-i18n="hero.eyebrow">阅读概览</p>
           <h1 data-i18n="hero.title">重新遇见读过的每一页</h1>
           <p class="hero-copy" data-i18n="hero.copy">整理你的进度、高亮与笔记。所有内容只从本机数据库读取，不会上传。</p>
         </div>
-        <div class="hero-orbit" aria-hidden="true"><span data-i18n="hero.mark">书</span></div>
       </section>
 
       <section class="review-panel" aria-labelledby="review-title">
         <div class="review-heading">
-          <div><p class="eyebrow" data-i18n="review.eyebrow">重新发现</p><h2 id="review-title" data-i18n="review.title">随机回顾</h2></div>
+          <h2 id="review-title" data-i18n="review.title">随机回顾</h2>
           <div class="review-actions">
             <label class="review-toggle"><input id="review-notes-only" type="checkbox"><span data-i18n="review.notesOnly">仅看笔记</span></label>
             <button id="new-review" type="button" data-i18n="review.next">换一条</button>
           </div>
         </div>
-        <div id="review-content" class="review-content" aria-live="polite">
+        <div id="review-content" class="review-content" tabindex="0" role="region" aria-labelledby="review-title" aria-live="polite">
           <p class="review-loading" data-i18n="review.loading">正在从旧时光里找一页…</p>
         </div>
       </section>
@@ -85,7 +85,12 @@
       <section class="annotation-search-section">
         <div class="section-heading">
           <div><p class="eyebrow" data-i18n="annotationSearch.eyebrow">思想索引</p><h2 data-i18n="annotationSearch.title">搜索全部批注</h2></div>
-          <p id="annotation-result-count" class="result-count"></p>
+          <div class="section-heading-actions">
+            <p id="annotation-result-count" class="result-count"></p>
+            <label class="page-size-control"><span data-i18n="pagination.pageSize">每页</span><select id="annotation-page-size" aria-label="批注每页数量" data-i18n-aria-label="annotationSearch.pageSizeLabel">
+              <option value="3">3</option><option value="6">6</option><option value="12">12</option><option value="24">24</option>
+            </select></label>
+          </div>
         </div>
         <form id="annotation-filters" class="annotation-filters" role="search">
           <label class="search-field"><span class="sr-only" data-i18n="annotationSearch.label">搜索批注</span>
@@ -111,10 +116,32 @@
         </nav>
       </section>
 
+      <section class="want-to-read-section" aria-labelledby="want-to-read-title">
+        <div class="section-heading">
+          <div><p class="eyebrow" data-i18n="wantToRead.eyebrow">待读书架</p><h2 id="want-to-read-title" data-i18n="wantToRead.title">欲读清单</h2></div>
+          <div class="section-heading-actions">
+            <p id="want-to-read-count" class="result-count" data-i18n="common.loading">正在载入…</p>
+            <label class="page-size-control"><span data-i18n="pagination.pageSize">每页</span><select id="want-to-read-page-size" aria-label="欲读清单每页数量" data-i18n-aria-label="wantToRead.pageSizeLabel">
+              <option value="4">4</option><option value="8">8</option><option value="12">12</option><option value="24">24</option>
+            </select></label>
+          </div>
+        </div>
+        <div id="want-to-read-grid" class="book-grid" aria-live="polite"></div>
+        <div id="want-to-read-empty" class="empty-state compact" hidden><h3 data-i18n="wantToRead.empty">欲读清单还是空的</h3></div>
+        <nav class="pagination" aria-label="欲读清单分页" data-i18n-aria-label="wantToRead.paginationLabel">
+          <button id="want-to-read-previous" type="button" data-i18n="pagination.previous">上一页</button><span id="want-to-read-page-label"></span><button id="want-to-read-next" type="button" data-i18n="pagination.next">下一页</button>
+        </nav>
+      </section>
+
       <section class="library-section">
         <div class="section-heading">
           <div><p class="eyebrow" data-i18n="library.eyebrow">书库</p><h2 data-i18n="library.title">我的书库</h2></div>
-          <p id="result-count" class="result-count" data-i18n="common.loading">正在载入…</p>
+          <div class="section-heading-actions">
+            <p id="result-count" class="result-count" data-i18n="common.loading">正在载入…</p>
+            <label class="page-size-control"><span data-i18n="pagination.pageSize">每页</span><select id="library-page-size" aria-label="书库每页数量" data-i18n-aria-label="library.pageSizeLabel">
+              <option value="4">4</option><option value="8">8</option><option value="12">12</option><option value="24">24</option><option value="48">48</option>
+            </select></label>
+          </div>
         </div>
 
         <form id="filters" class="filters" role="search">
