@@ -16,6 +16,10 @@ The project focuses first on its most important job: giving you a complete, port
 - Browse the library by collection year and finished books by completion year
 - Sort by recently opened, reading progress, title, or author
 - Rediscover a random historical highlight, with an option to show only excerpts that include a personal note
+- Search highlight text and notes across the library, with annotation-type and highlight-color filters
+- Generate annual reports covering collected and finished books, annotation days, monthly activity, and most-annotated books
+- Pick the next book from unread, stalled, or all books with the book picker
+- Restore Apple Books highlight colors in annotation lists and book details
 - Switch the interface between Chinese and English, with the preference remembered in the browser
 - Process everything locally without loading third-party resources in the page
 
@@ -141,6 +145,14 @@ Set the search, reading status, year, and sort options, then select “Export cu
 ### Random Review
 
 The home page selects an entry from your historical highlights. Enable “Notes only” to review only excerpts that have a personal note attached. Select the book title to open its detail view.
+
+### Search All Annotations
+
+Use the annotation search area to find text in highlights and notes across the entire library. Results can be narrowed by annotation type and Apple Books highlight color. Select a book title in the results to open its full details.
+
+### Annual Reports and Book Picker
+
+Annual reports show monthly activity and annotation-active days based on annotation creation dates; an active day means an annotation was created and does not represent a complete reading day. The book picker can choose from unread books, in-progress books not opened for more than 90 days, or the whole library.
 
 ## Data Notes
 

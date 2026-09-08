@@ -67,6 +67,47 @@ type Review struct {
 	Annotation Annotation `json:"annotation"`
 }
 
+type AnnotationQuery struct {
+	Search string
+	Kind   string
+	Style  int
+	Limit  int
+	Offset int
+}
+
+type AnnotationResult struct {
+	Book       Book       `json:"book"`
+	Annotation Annotation `json:"annotation"`
+}
+
+type AnnotationPage struct {
+	Items  []AnnotationResult `json:"items"`
+	Total  int64              `json:"total"`
+	Limit  int                `json:"limit"`
+	Offset int                `json:"offset"`
+}
+
+type MonthActivity struct {
+	Month           int   `json:"month"`
+	AnnotationCount int64 `json:"annotationCount"`
+}
+
+type ReportBook struct {
+	Book            Book  `json:"book"`
+	AnnotationCount int64 `json:"annotationCount"`
+}
+
+type YearReport struct {
+	Year            int             `json:"year"`
+	CollectedBooks  int64           `json:"collectedBooks"`
+	FinishedBooks   int64           `json:"finishedBooks"`
+	AnnotationCount int64           `json:"annotationCount"`
+	NoteCount       int64           `json:"noteCount"`
+	ActiveDays      int             `json:"activeDays"`
+	Months          []MonthActivity `json:"months"`
+	TopBooks        []ReportBook    `json:"topBooks"`
+}
+
 type BookQuery struct {
 	Search         string
 	Status         string

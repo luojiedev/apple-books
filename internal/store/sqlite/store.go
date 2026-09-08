@@ -395,6 +395,42 @@ func (s *Store) RandomReview(ctx context.Context, key string, notesOnly bool) (d
 	return domain.Review{}, store.ErrNotFound
 }
 
+func (s *Store) RandomBook(ctx context.Context, key, mode string) (domain.Book, error) {
+	where := ""
+	switch mode {
+	case "unread":
+		where = "WHERE COALESCE(ZREADINGPROGRESS, 0) = 0 AND COALESCE(ZISFINISHED, 0) <> 1 AND ZDATEFINISHED IS NULL"
+	case "stalled":
+		cutoff := time.Now().AddDate(0, 0, -90).Unix() - appleEpochOffset
+		where = "WHERE COALESCE(ZREADINGPROGRESS, 0) > 0 AND COALESCE(ZISFINISHED, 0) <> 1 AND ZDATEFINISHED IS NULL AND (ZLASTOPENDATE IS NULL OR ZLASTOPENDATE < ?)"
+		return s.randomBookWithArguments(ctx, key, where, cutoff)
+	}
+	return s.randomBookWithArguments(ctx, key, where)
+}
+
+func (s *Store) randomBookWithArguments(ctx context.Context, key, where string, arguments ...any) (domain.Book, error) {
+	var count int64
+	if err := s.library.QueryRowContext(ctx, "SELECT COUNT(*) FROM ZBKLIBRARYASSET "+where, arguments...).Scan(&count); err != nil {
+		return domain.Book{}, fmt.Errorf("count book candidates: %w", err)
+	}
+	if count == 0 {
+		return domain.Book{}, store.ErrNotFound
+	}
+	hasher := fnv.New64a()
+	_, _ = hasher.Write([]byte(key))
+	offset := int64(hasher.Sum64() % uint64(count))
+	queryArguments := append(append([]any{}, arguments...), offset)
+	book, err := scanBook(s.library.QueryRowContext(ctx, bookSelect+" "+where+" ORDER BY Z_PK LIMIT 1 OFFSET ?", queryArguments...))
+	if err != nil {
+		return domain.Book{}, fmt.Errorf("select random book: %w", err)
+	}
+	books := []domain.Book{book}
+	if err := s.addAnnotationCounts(ctx, books); err != nil {
+		return domain.Book{}, err
+	}
+	return books[0], nil
+}
+
 func reviewFilter(notesOnly bool) string {
 	filter := `WHERE COALESCE(ZANNOTATIONDELETED, 0) = 0
 		AND ZANNOTATIONTYPE IN (1, 2)
@@ -529,6 +565,174 @@ func (s *Store) Annotations(ctx context.Context, assetID string) ([]domain.Annot
 		return nil, fmt.Errorf("iterate annotations: %w", err)
 	}
 	return annotations, nil
+}
+
+func (s *Store) SearchAnnotations(ctx context.Context, query domain.AnnotationQuery) (domain.AnnotationPage, error) {
+	where, arguments := annotationFilters(query)
+	var total int64
+	if err := s.annotation.QueryRowContext(ctx, "SELECT COUNT(*) FROM ZAEANNOTATION "+where, arguments...).Scan(&total); err != nil {
+		return domain.AnnotationPage{}, fmt.Errorf("count annotation search results: %w", err)
+	}
+
+	pageArguments := append(append([]any{}, arguments...), query.Limit, query.Offset)
+	rows, err := s.annotation.QueryContext(ctx, `
+		SELECT Z_PK, COALESCE(ZANNOTATIONUUID, ''), COALESCE(ZANNOTATIONTYPE, 0),
+		       COALESCE(ZANNOTATIONSTYLE, 0), COALESCE(ZANNOTATIONISUNDERLINE, 0),
+		       COALESCE(ZANNOTATIONSELECTEDTEXT, ''), COALESCE(ZANNOTATIONNOTE, ''),
+		       COALESCE(ZANNOTATIONLOCATION, ''), ZANNOTATIONCREATIONDATE, ZANNOTATIONMODIFICATIONDATE,
+		       COALESCE(ZANNOTATIONASSETID, '')
+		FROM ZAEANNOTATION `+where+`
+		ORDER BY COALESCE(ZANNOTATIONMODIFICATIONDATE, ZANNOTATIONCREATIONDATE) DESC, Z_PK DESC
+		LIMIT ? OFFSET ?`, pageArguments...)
+	if err != nil {
+		return domain.AnnotationPage{}, fmt.Errorf("search annotations: %w", err)
+	}
+	defer rows.Close()
+
+	type annotationAsset struct {
+		annotation domain.Annotation
+		assetID    string
+	}
+	matches := make([]annotationAsset, 0, query.Limit)
+	for rows.Next() {
+		var match annotationAsset
+		var annotationType, underline int64
+		var createdAt, modifiedAt sql.NullFloat64
+		if err := rows.Scan(
+			&match.annotation.ID, &match.annotation.UUID, &annotationType, &match.annotation.Style, &underline,
+			&match.annotation.SelectedText, &match.annotation.Note, &match.annotation.Location,
+			&createdAt, &modifiedAt, &match.assetID,
+		); err != nil {
+			return domain.AnnotationPage{}, fmt.Errorf("scan annotation search result: %w", err)
+		}
+		match.annotation.Type = annotationTypeName(annotationType)
+		match.annotation.IsUnderline = underline == 1
+		match.annotation.CreatedAt = appleTime(createdAt)
+		match.annotation.ModifiedAt = appleTime(modifiedAt)
+		matches = append(matches, match)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.AnnotationPage{}, fmt.Errorf("iterate annotation search results: %w", err)
+	}
+
+	items := make([]domain.AnnotationResult, 0, len(matches))
+	for _, match := range matches {
+		book, err := s.bookByAssetID(ctx, match.assetID)
+		if errors.Is(err, store.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return domain.AnnotationPage{}, err
+		}
+		items = append(items, domain.AnnotationResult{Book: book, Annotation: match.annotation})
+	}
+	return domain.AnnotationPage{Items: items, Total: total, Limit: query.Limit, Offset: query.Offset}, nil
+}
+
+func annotationFilters(query domain.AnnotationQuery) (string, []any) {
+	clauses := []string{
+		"COALESCE(ZANNOTATIONDELETED, 0) = 0",
+		"ZANNOTATIONTYPE IN (1, 2)",
+	}
+	arguments := make([]any, 0, 3)
+	if search := strings.TrimSpace(query.Search); search != "" {
+		pattern := "%" + search + "%"
+		clauses = append(clauses, "(ZANNOTATIONSELECTEDTEXT LIKE ? OR ZANNOTATIONNOTE LIKE ?)")
+		arguments = append(arguments, pattern, pattern)
+	}
+	switch query.Kind {
+	case "note":
+		clauses = append(clauses, "COALESCE(ZANNOTATIONNOTE, '') <> ''")
+	case "highlight":
+		clauses = append(clauses, "ZANNOTATIONTYPE = 2 AND COALESCE(ZANNOTATIONSELECTEDTEXT, '') <> ''")
+	case "bookmark":
+		clauses = append(clauses, "ZANNOTATIONTYPE = 1")
+	}
+	if query.Style >= 0 {
+		clauses = append(clauses, "COALESCE(ZANNOTATIONSTYLE, 0) = ?")
+		arguments = append(arguments, query.Style)
+	}
+	return "WHERE " + strings.Join(clauses, " AND "), arguments
+}
+
+func (s *Store) YearReport(ctx context.Context, year int) (domain.YearReport, error) {
+	report := domain.YearReport{Year: year, Months: make([]domain.MonthActivity, 12)}
+	for month := range report.Months {
+		report.Months[month].Month = month + 1
+	}
+	start := time.Date(year, time.January, 1, 0, 0, 0, 0, time.Local).Unix() - appleEpochOffset
+	end := time.Date(year+1, time.January, 1, 0, 0, 0, 0, time.Local).Unix() - appleEpochOffset
+	if err := s.library.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM ZBKLIBRARYASSET WHERE "+collectionDateExpression+" >= ? AND "+collectionDateExpression+" < ?", start, end,
+	).Scan(&report.CollectedBooks); err != nil {
+		return domain.YearReport{}, fmt.Errorf("count collected books for year report: %w", err)
+	}
+	if err := s.library.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM ZBKLIBRARYASSET WHERE ZDATEFINISHED >= ? AND ZDATEFINISHED < ?", start, end,
+	).Scan(&report.FinishedBooks); err != nil {
+		return domain.YearReport{}, fmt.Errorf("count finished books for year report: %w", err)
+	}
+
+	rows, err := s.annotation.QueryContext(ctx, `
+		SELECT ZANNOTATIONCREATIONDATE, COALESCE(ZANNOTATIONNOTE, ''), COALESCE(ZANNOTATIONASSETID, '')
+		FROM ZAEANNOTATION
+		WHERE COALESCE(ZANNOTATIONDELETED, 0) = 0
+		  AND ZANNOTATIONTYPE IN (1, 2)
+		  AND ZANNOTATIONCREATIONDATE >= ? AND ZANNOTATIONCREATIONDATE < ?`, start, end)
+	if err != nil {
+		return domain.YearReport{}, fmt.Errorf("query annotation activity for year report: %w", err)
+	}
+	defer rows.Close()
+	activeDates := make(map[string]struct{})
+	bookCounts := make(map[string]int64)
+	for rows.Next() {
+		var rawDate sql.NullFloat64
+		var note, assetID string
+		if err := rows.Scan(&rawDate, &note, &assetID); err != nil {
+			return domain.YearReport{}, fmt.Errorf("scan year report annotation: %w", err)
+		}
+		createdAt := appleTime(rawDate)
+		if createdAt == nil {
+			continue
+		}
+		report.AnnotationCount++
+		if strings.TrimSpace(note) != "" {
+			report.NoteCount++
+		}
+		report.Months[int(createdAt.Month())-1].AnnotationCount++
+		activeDates[createdAt.Format("2006-01-02")] = struct{}{}
+		if assetID != "" {
+			bookCounts[assetID]++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return domain.YearReport{}, fmt.Errorf("iterate year report annotations: %w", err)
+	}
+	report.ActiveDays = len(activeDates)
+
+	type bookCount struct {
+		assetID string
+		count   int64
+	}
+	ranked := make([]bookCount, 0, len(bookCounts))
+	for assetID, count := range bookCounts {
+		ranked = append(ranked, bookCount{assetID: assetID, count: count})
+	}
+	sort.Slice(ranked, func(left, right int) bool { return ranked[left].count > ranked[right].count })
+	for _, item := range ranked {
+		book, err := s.bookByAssetID(ctx, item.assetID)
+		if errors.Is(err, store.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return domain.YearReport{}, err
+		}
+		report.TopBooks = append(report.TopBooks, domain.ReportBook{Book: book, AnnotationCount: item.count})
+		if len(report.TopBooks) == 5 {
+			break
+		}
+	}
+	return report, nil
 }
 
 func annotationTypeName(value int64) string {

@@ -60,6 +60,57 @@
         <div class="stat-card"><span data-i18n="annotation.note">笔记</span><strong data-stat="noteCount">—</strong><small data-i18n="unit.items">条</small></div>
       </section>
 
+      <section class="discovery-grid" aria-label="阅读探索" data-i18n-aria-label="discovery.label">
+        <article class="picker-panel">
+          <div><p class="eyebrow" data-i18n="picker.eyebrow">下一本</p><h2 data-i18n="picker.title">今天读什么？</h2></div>
+          <p data-i18n="picker.copy">让书架替你做一次轻松的决定。</p>
+          <label><span class="sr-only" data-i18n="picker.modeLabel">选书模式</span><select id="picker-mode">
+            <option value="unread" data-i18n="picker.unread">从未读书中选</option>
+            <option value="stalled" data-i18n="picker.stalled">找回搁置的书</option>
+            <option value="any" data-i18n="picker.any">全书库漫游</option>
+          </select></label>
+          <button id="pick-book" type="button" data-i18n="picker.action">替我选一本</button>
+          <div id="picker-result" class="picker-result" aria-live="polite"></div>
+        </article>
+
+        <article class="report-panel">
+          <div class="report-heading">
+            <div><p class="eyebrow" data-i18n="report.eyebrow">年度足迹</p><h2 data-i18n="report.title">阅读年度报告</h2></div>
+            <label><span class="sr-only" data-i18n="report.yearLabel">报告年份</span><select id="report-year"></select></label>
+          </div>
+          <div id="report-content" class="report-content" aria-live="polite"><p data-i18n="common.loading">正在载入…</p></div>
+        </article>
+      </section>
+
+      <section class="annotation-search-section">
+        <div class="section-heading">
+          <div><p class="eyebrow" data-i18n="annotationSearch.eyebrow">思想索引</p><h2 data-i18n="annotationSearch.title">搜索全部批注</h2></div>
+          <p id="annotation-result-count" class="result-count"></p>
+        </div>
+        <form id="annotation-filters" class="annotation-filters" role="search">
+          <label class="search-field"><span class="sr-only" data-i18n="annotationSearch.label">搜索批注</span>
+            <input id="annotation-search" type="search" placeholder="搜索高亮正文或笔记…" data-i18n-placeholder="annotationSearch.placeholder" autocomplete="off">
+          </label>
+          <label><span class="sr-only" data-i18n="annotationSearch.kindLabel">批注类型</span><select id="annotation-kind">
+            <option value="all" data-i18n="annotationSearch.allKinds">全部类型</option>
+            <option value="highlight" data-i18n="annotation.highlight">高亮</option>
+            <option value="note" data-i18n="annotation.note">笔记</option>
+            <option value="bookmark" data-i18n="annotation.bookmark">书签</option>
+          </select></label>
+          <label><span class="sr-only" data-i18n="annotationSearch.styleLabel">高亮颜色</span><select id="annotation-style">
+            <option value="" data-i18n="annotationSearch.allStyles">全部颜色</option>
+            <option value="0" data-i18n="style.none">下划线</option><option value="1" data-i18n="style.green">绿色</option>
+            <option value="2" data-i18n="style.blue">蓝色</option><option value="3" data-i18n="style.yellow">黄色</option>
+            <option value="4" data-i18n="style.pink">粉色</option><option value="5" data-i18n="style.purple">紫色</option>
+          </select></label>
+        </form>
+        <div id="annotation-results" class="annotation-results" aria-live="polite"></div>
+        <div id="annotation-empty" class="empty-state compact" hidden><h3 data-i18n="annotationSearch.empty">没有找到匹配的批注</h3></div>
+        <nav class="pagination" aria-label="批注分页" data-i18n-aria-label="annotationSearch.paginationLabel">
+          <button id="annotation-previous" type="button" data-i18n="pagination.previous">上一页</button><span id="annotation-page-label"></span><button id="annotation-next" type="button" data-i18n="pagination.next">下一页</button>
+        </nav>
+      </section>
+
       <section class="library-section">
         <div class="section-heading">
           <div><p class="eyebrow" data-i18n="library.eyebrow">书库</p><h2 data-i18n="library.title">我的书库</h2></div>

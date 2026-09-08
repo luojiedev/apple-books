@@ -80,3 +80,32 @@ func TestParseBookQueryRejectsUnsupportedStatus(t *testing.T) {
 		t.Fatal("parseBookQuery() should reject an unsupported status")
 	}
 }
+
+func TestParseAnnotationQuery(t *testing.T) {
+	request := httptest.NewRequest("GET", "/api/annotations?q=%E6%91%98%E5%BD%95&kind=note&style=3&limit=12&offset=24", nil)
+	query, err := parseAnnotationQuery(request)
+	if err != nil {
+		t.Fatalf("parseAnnotationQuery() error = %v", err)
+	}
+	if query.Search != "摘录" || query.Kind != "note" || query.Style != 3 || query.Limit != 12 || query.Offset != 24 {
+		t.Fatalf("unexpected query: %+v", query)
+	}
+}
+
+func TestParseAnnotationQueryUsesAllStylesByDefault(t *testing.T) {
+	request := httptest.NewRequest("GET", "/api/annotations", nil)
+	query, err := parseAnnotationQuery(request)
+	if err != nil {
+		t.Fatalf("parseAnnotationQuery() error = %v", err)
+	}
+	if query.Style != -1 {
+		t.Fatalf("style = %d, want -1", query.Style)
+	}
+}
+
+func TestParseAnnotationQueryRejectsUnsupportedKind(t *testing.T) {
+	request := httptest.NewRequest("GET", "/api/annotations?kind=drawing", nil)
+	if _, err := parseAnnotationQuery(request); err == nil {
+		t.Fatal("parseAnnotationQuery() should reject an unsupported kind")
+	}
+}

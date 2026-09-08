@@ -122,6 +122,40 @@ func TestStoreReadsBooksAndUserAnnotations(t *testing.T) {
 	if firstReview.Book.Title != "测试书" {
 		t.Fatalf("unexpected review book: %+v", firstReview.Book)
 	}
+
+	annotationPage, err := reader.SearchAnnotations(context.Background(), domain.AnnotationQuery{
+		Search: "摘录", Kind: "note", Style: 3, Limit: 10,
+	})
+	if err != nil {
+		t.Fatalf("SearchAnnotations() error = %v", err)
+	}
+	if annotationPage.Total != 1 || len(annotationPage.Items) != 1 || annotationPage.Items[0].Book.Title != "测试书" {
+		t.Fatalf("unexpected annotation search page: %+v", annotationPage)
+	}
+
+	pickedBook, err := reader.RandomBook(context.Background(), "stable-book-key", "any")
+	if err != nil {
+		t.Fatalf("RandomBook() error = %v", err)
+	}
+	repeatedPick, err := reader.RandomBook(context.Background(), "stable-book-key", "any")
+	if err != nil {
+		t.Fatalf("RandomBook() repeated error = %v", err)
+	}
+	if pickedBook.ID == 0 || pickedBook.ID != repeatedPick.ID {
+		t.Fatalf("random book must be deterministic for the same key: first=%+v second=%+v", pickedBook, repeatedPick)
+	}
+
+	reportYear := annotations[0].CreatedAt.Year()
+	report, err := reader.YearReport(context.Background(), reportYear)
+	if err != nil {
+		t.Fatalf("YearReport() error = %v", err)
+	}
+	if report.AnnotationCount != 1 || report.NoteCount != 1 || report.ActiveDays != 1 {
+		t.Fatalf("unexpected year report totals: %+v", report)
+	}
+	if len(report.TopBooks) != 1 || report.TopBooks[0].Book.Title != "测试书" {
+		t.Fatalf("unexpected year report ranking: %+v", report.TopBooks)
+	}
 }
 
 func createLibraryFixture(t *testing.T, path string) {

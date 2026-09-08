@@ -35,7 +35,10 @@ func New(reader store.Reader) (*Server, error) {
 	mux.HandleFunc("GET /api/health", server.health)
 	mux.HandleFunc("GET /api/summary", server.summary)
 	mux.HandleFunc("GET /api/review/random", server.randomReview)
+	mux.HandleFunc("GET /api/books/pick", server.randomBook)
 	mux.HandleFunc("GET /api/books", server.books)
+	mux.HandleFunc("GET /api/annotations", server.searchAnnotations)
+	mux.HandleFunc("GET /api/reports/year", server.yearReport)
 	mux.HandleFunc("GET /api/books/{id}", server.book)
 	mux.HandleFunc("GET /api/books/{id}/annotations", server.annotations)
 	mux.HandleFunc("GET /api/books/{id}/annotations.md", server.exportBookAnnotations)
@@ -83,6 +86,63 @@ func (s *Server) randomReview(response http.ResponseWriter, request *http.Reques
 		return
 	}
 	writeJSON(response, http.StatusOK, review)
+}
+
+func (s *Server) randomBook(response http.ResponseWriter, request *http.Request) {
+	key := strings.TrimSpace(request.URL.Query().Get("key"))
+	if key == "" || len(key) > 128 {
+		writeClientError(response, "选书 key 不能为空且不能超过 128 个字符")
+		return
+	}
+	mode := request.URL.Query().Get("mode")
+	if mode == "" {
+		mode = "unread"
+	}
+	if mode != "unread" && mode != "stalled" && mode != "any" {
+		writeClientError(response, "不支持的选书模式")
+		return
+	}
+	book, err := s.reader.RandomBook(request.Context(), key, mode)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeJSON(response, http.StatusNotFound, errorResponse{Error: "没有符合条件的书"})
+			return
+		}
+		writeError(response, err)
+		return
+	}
+	log.Debug("book picker selected a candidate", "mode", mode, "book_id", book.ID)
+	writeJSON(response, http.StatusOK, book)
+}
+
+func (s *Server) searchAnnotations(response http.ResponseWriter, request *http.Request) {
+	query, err := parseAnnotationQuery(request)
+	if err != nil {
+		writeClientError(response, err.Error())
+		return
+	}
+	page, err := s.reader.SearchAnnotations(request.Context(), query)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	log.Debug("annotation search completed", "kind", query.Kind, "style", query.Style, "total", page.Total)
+	writeJSON(response, http.StatusOK, page)
+}
+
+func (s *Server) yearReport(response http.ResponseWriter, request *http.Request) {
+	year, err := optionalYear(request.URL.Query().Get("year"))
+	if err != nil || year == 0 {
+		writeClientError(response, "报告年份必须是 1900 到 3000 之间的整数")
+		return
+	}
+	report, err := s.reader.YearReport(request.Context(), year)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	log.Debug("year report generated", "year", year, "annotations", report.AnnotationCount, "active_days", report.ActiveDays)
+	writeJSON(response, http.StatusOK, report)
 }
 
 func (s *Server) books(response http.ResponseWriter, request *http.Request) {
@@ -216,6 +276,34 @@ func parseBookQuery(request *http.Request) (domain.BookQuery, error) {
 		Search: strings.TrimSpace(values.Get("q")), Status: status, Sort: sort,
 		FinishedYear: finishedYear, CollectionYear: collectionYear, Limit: limit, Offset: offset,
 	}, nil
+}
+
+func parseAnnotationQuery(request *http.Request) (domain.AnnotationQuery, error) {
+	values := request.URL.Query()
+	limit, err := boundedInt(values.Get("limit"), 20, 1, 100)
+	if err != nil {
+		return domain.AnnotationQuery{}, fmt.Errorf("limit 必须是 1 到 100 之间的整数")
+	}
+	offset, err := boundedInt(values.Get("offset"), 0, 0, 1_000_000)
+	if err != nil {
+		return domain.AnnotationQuery{}, fmt.Errorf("offset 必须是非负整数")
+	}
+	kind := values.Get("kind")
+	if kind != "" && kind != "all" && kind != "highlight" && kind != "note" && kind != "bookmark" {
+		return domain.AnnotationQuery{}, fmt.Errorf("不支持的批注类型")
+	}
+	style := -1
+	if rawStyle := values.Get("style"); rawStyle != "" {
+		style, err = boundedInt(rawStyle, -1, 0, 20)
+		if err != nil {
+			return domain.AnnotationQuery{}, fmt.Errorf("高亮样式必须是 0 到 20 之间的整数")
+		}
+	}
+	search := strings.TrimSpace(values.Get("q"))
+	if len(search) > 200 {
+		return domain.AnnotationQuery{}, fmt.Errorf("搜索内容不能超过 200 个字符")
+	}
+	return domain.AnnotationQuery{Search: search, Kind: kind, Style: style, Limit: limit, Offset: offset}, nil
 }
 
 func optionalYear(raw string) (int, error) {

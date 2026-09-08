@@ -3,6 +3,10 @@ const state = {
   offset: 0,
   total: 0,
   searchTimer: null,
+  annotationLimit: 12,
+  annotationOffset: 0,
+  annotationTotal: 0,
+  annotationSearchTimer: null,
   finishedYears: [],
   collectionYears: [],
   bookDetail: null,
@@ -28,6 +32,45 @@ const translations = {
     'review.next': '换一条',
     'review.loading': '正在从旧时光里找一页…',
     'review.empty': '没有可回顾的划线或笔记',
+    'discovery.label': '阅读探索',
+    'picker.eyebrow': '下一本',
+    'picker.title': '今天读什么？',
+    'picker.copy': '让书架替你做一次轻松的决定。',
+    'picker.modeLabel': '选书模式',
+    'picker.unread': '从未读书中选',
+    'picker.stalled': '找回搁置的书',
+    'picker.any': '全书库漫游',
+    'picker.action': '替我选一本',
+    'picker.empty': '当前没有符合这个条件的书',
+    'picker.progress': '当前进度 {percent}%',
+    'report.eyebrow': '年度足迹',
+    'report.title': '阅读年度报告',
+    'report.yearLabel': '报告年份',
+    'report.collected': '收集',
+    'report.finished': '读完',
+    'report.annotations': '批注',
+    'report.notes': '笔记',
+    'report.activeDays': '批注活跃日',
+    'report.monthly': '每月批注',
+    'report.topBooks': '批注最多的书',
+    'report.noTopBooks': '这一年还没有可排行的书籍批注。',
+    'annotationSearch.eyebrow': '思想索引',
+    'annotationSearch.title': '搜索全部批注',
+    'annotationSearch.label': '搜索批注',
+    'annotationSearch.placeholder': '搜索高亮正文或笔记…',
+    'annotationSearch.kindLabel': '批注类型',
+    'annotationSearch.styleLabel': '高亮颜色',
+    'annotationSearch.allKinds': '全部类型',
+    'annotationSearch.allStyles': '全部颜色',
+    'annotationSearch.count': '共 {count} 条',
+    'annotationSearch.empty': '没有找到匹配的批注',
+    'annotationSearch.paginationLabel': '批注分页',
+    'style.none': '下划线',
+    'style.green': '绿色',
+    'style.blue': '蓝色',
+    'style.yellow': '黄色',
+    'style.pink': '粉色',
+    'style.purple': '紫色',
     'stats.label': '阅读统计',
     'stats.allLabel': '查看全部藏书',
     'stats.readingLabel': '查看阅读中的书籍',
@@ -113,6 +156,45 @@ const translations = {
     'review.next': 'Show another',
     'review.loading': 'Finding a page from your reading past…',
     'review.empty': 'No highlights or notes are available for review',
+    'discovery.label': 'Reading discovery',
+    'picker.eyebrow': 'UP NEXT',
+    'picker.title': 'What should I read?',
+    'picker.copy': 'Let your bookshelf make one easy decision for you.',
+    'picker.modeLabel': 'Book picker mode',
+    'picker.unread': 'Pick from unread books',
+    'picker.stalled': 'Rediscover a stalled book',
+    'picker.any': 'Wander the whole library',
+    'picker.action': 'Pick a book',
+    'picker.empty': 'No book matches this mode right now',
+    'picker.progress': '{percent}% read',
+    'report.eyebrow': 'YEAR IN READING',
+    'report.title': 'Annual report',
+    'report.yearLabel': 'Report year',
+    'report.collected': 'Collected',
+    'report.finished': 'Finished',
+    'report.annotations': 'Annotations',
+    'report.notes': 'Notes',
+    'report.activeDays': 'Annotation days',
+    'report.monthly': 'Monthly annotations',
+    'report.topBooks': 'Most annotated books',
+    'report.noTopBooks': 'There are no ranked book annotations for this year.',
+    'annotationSearch.eyebrow': 'IDEA INDEX',
+    'annotationSearch.title': 'Search all annotations',
+    'annotationSearch.label': 'Search annotations',
+    'annotationSearch.placeholder': 'Search highlight text or notes…',
+    'annotationSearch.kindLabel': 'Annotation type',
+    'annotationSearch.styleLabel': 'Highlight color',
+    'annotationSearch.allKinds': 'All types',
+    'annotationSearch.allStyles': 'All colors',
+    'annotationSearch.count': '{count} items',
+    'annotationSearch.empty': 'No matching annotations',
+    'annotationSearch.paginationLabel': 'Annotation pages',
+    'style.none': 'Underline',
+    'style.green': 'Green',
+    'style.blue': 'Blue',
+    'style.yellow': 'Yellow',
+    'style.pink': 'Pink',
+    'style.purple': 'Purple',
     'stats.label': 'Reading statistics',
     'stats.allLabel': 'View all books',
     'stats.readingLabel': 'View books in progress',
@@ -198,6 +280,20 @@ const elements = {
   reviewContent: document.querySelector('#review-content'),
   reviewNotesOnly: document.querySelector('#review-notes-only'),
   newReview: document.querySelector('#new-review'),
+  pickerMode: document.querySelector('#picker-mode'),
+  pickBook: document.querySelector('#pick-book'),
+  pickerResult: document.querySelector('#picker-result'),
+  reportYear: document.querySelector('#report-year'),
+  reportContent: document.querySelector('#report-content'),
+  annotationSearch: document.querySelector('#annotation-search'),
+  annotationKind: document.querySelector('#annotation-kind'),
+  annotationStyle: document.querySelector('#annotation-style'),
+  annotationResults: document.querySelector('#annotation-results'),
+  annotationEmpty: document.querySelector('#annotation-empty'),
+  annotationCount: document.querySelector('#annotation-result-count'),
+  annotationPrevious: document.querySelector('#annotation-previous'),
+  annotationNext: document.querySelector('#annotation-next'),
+  annotationPageLabel: document.querySelector('#annotation-page-label'),
   dialog: document.querySelector('#book-dialog'),
   dialogContent: document.querySelector('#dialog-content'),
   toast: document.querySelector('#toast'),
@@ -282,6 +378,22 @@ async function loadSummary() {
   state.finishedYears = summary.finishedYears || [];
   state.collectionYears = summary.collectionYears || [];
   updateYearOptions();
+  updateReportYears();
+}
+
+function updateReportYears() {
+  const previousValue = elements.reportYear.value;
+  const years = new Set([new Date().getFullYear()]);
+  state.finishedYears.forEach(({ year }) => years.add(year));
+  state.collectionYears.forEach(({ year }) => years.add(year));
+  elements.reportYear.replaceChildren();
+  [...years].sort((left, right) => right - left).forEach((year) => {
+    const option = document.createElement('option');
+    option.value = String(year);
+    option.textContent = String(year);
+    elements.reportYear.append(option);
+  });
+  if ([...years].some((year) => String(year) === previousValue)) elements.reportYear.value = previousValue;
 }
 
 function updateYearOptions() {
@@ -339,6 +451,117 @@ function dailyReviewKey() {
 
 function newReviewKey() {
   return window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+}
+
+async function pickBook() {
+  elements.pickBook.disabled = true;
+  elements.pickerResult.innerHTML = `<p class="review-loading">${t('common.loading')}</p>`;
+  try {
+    const key = newReviewKey();
+    const book = await requestJSON(`/api/books/pick?mode=${encodeURIComponent(elements.pickerMode.value)}&key=${encodeURIComponent(key)}`);
+    const percent = Math.max(0, Math.min(100, book.progress * 100)).toFixed(1);
+    elements.pickerResult.innerHTML = `
+      <button class="picked-book" type="button">
+        <strong>${escapeHTML(book.title || t('book.untitled'))}</strong>
+        <span>${escapeHTML(book.author || t('book.unknownAuthor'))}</span>
+        <small>${t('picker.progress', { percent })}</small>
+      </button>`;
+    elements.pickerResult.querySelector('.picked-book').addEventListener('click', () => openBook(book.id));
+  } catch (error) {
+    const message = error.message === t('error.read') ? t('picker.empty') : error.message;
+    elements.pickerResult.innerHTML = `<p>${escapeHTML(message)}</p>`;
+  } finally {
+    elements.pickBook.disabled = false;
+  }
+}
+
+async function loadYearReport() {
+  const year = elements.reportYear.value || String(new Date().getFullYear());
+  elements.reportContent.innerHTML = `<p>${t('common.loading')}</p>`;
+  try {
+    const report = await requestJSON(`/api/reports/year?year=${encodeURIComponent(year)}`);
+    renderYearReport(report);
+  } catch (error) {
+    elements.reportContent.innerHTML = `<p>${escapeHTML(error.message)}</p>`;
+  }
+}
+
+function renderYearReport(report) {
+  const maximum = Math.max(1, ...report.months.map((month) => month.annotationCount));
+  const monthFormatter = new Intl.DateTimeFormat(displayLocale(), { month: 'short' });
+  const bars = report.months.map((month) => {
+    const label = monthFormatter.format(new Date(report.year, month.month - 1, 1));
+    const height = Math.max(3, Math.round((month.annotationCount / maximum) * 64));
+    const top = 64 - height;
+    const accessibleLabel = `${label}: ${month.annotationCount}`;
+    return `<div class="month-bar">
+      <svg class="month-column" viewBox="0 0 20 64" role="img" aria-label="${escapeHTML(accessibleLabel)}">
+        <title>${escapeHTML(accessibleLabel)}</title><rect x="0" y="${top}" width="20" height="${height}" rx="3"></rect>
+      </svg>
+      <small>${escapeHTML(label)}</small>
+    </div>`;
+  }).join('');
+  const topBooks = report.topBooks.length
+    ? report.topBooks.map((item, index) => `<button type="button" data-book-id="${item.book.id}"><span>${index + 1}. ${escapeHTML(item.book.title || t('book.untitled'))}</span><strong>${item.annotationCount}</strong></button>`).join('')
+    : `<p class="report-empty">${t('report.noTopBooks')}</p>`;
+  elements.reportContent.innerHTML = `
+    <div class="report-metrics">
+      <div><strong>${report.collectedBooks}</strong><span>${t('report.collected')}</span></div>
+      <div><strong>${report.finishedBooks}</strong><span>${t('report.finished')}</span></div>
+      <div><strong>${report.annotationCount}</strong><span>${t('report.annotations')}</span></div>
+      <div><strong>${report.noteCount}</strong><span>${t('report.notes')}</span></div>
+      <div><strong>${report.activeDays}</strong><span>${t('report.activeDays')}</span></div>
+    </div>
+    <h3>${t('report.monthly')}</h3><div class="month-chart">${bars}</div>
+    <h3>${t('report.topBooks')}</h3><div class="report-ranking">${topBooks}</div>`;
+  elements.reportContent.querySelectorAll('[data-book-id]').forEach((button) => button.addEventListener('click', () => openBook(button.dataset.bookId)));
+}
+
+function annotationQueryParameters() {
+  const params = new URLSearchParams({ limit: state.annotationLimit, offset: state.annotationOffset });
+  if (elements.annotationSearch.value.trim()) params.set('q', elements.annotationSearch.value.trim());
+  if (elements.annotationKind.value !== 'all') params.set('kind', elements.annotationKind.value);
+  if (elements.annotationStyle.value !== '') params.set('style', elements.annotationStyle.value);
+  return params;
+}
+
+async function loadAnnotations() {
+  elements.annotationResults.innerHTML = `<div class="loading">${t('common.loading')}</div>`;
+  elements.annotationEmpty.hidden = true;
+  try {
+    const page = await requestJSON(`/api/annotations?${annotationQueryParameters()}`);
+    state.annotationTotal = page.total;
+    renderAnnotationResults(page.items);
+    updateAnnotationPagination();
+    elements.annotationCount.textContent = t('annotationSearch.count', { count: page.total.toLocaleString(displayLocale()) });
+  } catch (error) {
+    elements.annotationResults.innerHTML = '';
+    showToast(error.message);
+  }
+}
+
+function renderAnnotationResults(items) {
+  elements.annotationResults.innerHTML = '';
+  elements.annotationEmpty.hidden = items.length > 0;
+  items.forEach(({ book, annotation }) => {
+    const card = document.createElement('article');
+    card.className = `annotation-result annotation-style-${annotation.style}`;
+    card.innerHTML = `
+      <button class="annotation-book-link" type="button">${escapeHTML(book.title || t('book.untitled'))}</button>
+      <blockquote>${escapeHTML(annotation.selectedText || annotation.note || t('annotation.bookmark'))}</blockquote>
+      ${annotation.note && annotation.note !== annotation.selectedText ? `<p>${t('detail.notePrefix')}${escapeHTML(annotation.note)}</p>` : ''}
+      <small>${annotationTypeText(annotation)} · ${formatDate(annotation.createdAt)}</small>`;
+    card.querySelector('button').addEventListener('click', () => openBook(book.id));
+    elements.annotationResults.append(card);
+  });
+}
+
+function updateAnnotationPagination() {
+  const page = Math.floor(state.annotationOffset / state.annotationLimit) + 1;
+  const pages = Math.max(1, Math.ceil(state.annotationTotal / state.annotationLimit));
+  elements.annotationPageLabel.textContent = `${page} / ${pages}`;
+  elements.annotationPrevious.disabled = state.annotationOffset === 0;
+  elements.annotationNext.disabled = state.annotationOffset + state.annotationLimit >= state.annotationTotal;
 }
 
 async function loadBooks() {
@@ -429,7 +652,7 @@ function renderBookDetail(book, annotations) {
   const percent = Math.max(0, Math.min(100, book.progress * 100));
   const annotationHTML = annotations.length
     ? annotations.map((annotation) => `
-      <article class="annotation">
+      <article class="annotation annotation-style-${annotation.style}">
         ${annotation.selectedText ? `<blockquote>“${escapeHTML(annotation.selectedText)}”</blockquote>` : `<blockquote>${t('annotation.bookmark')}</blockquote>`}
         ${annotation.note ? `<p class="annotation-note">${t('detail.notePrefix')}${escapeHTML(annotation.note)}</p>` : ''}
         <p class="annotation-time">${annotationTypeText(annotation)} · ${formatDate(annotation.createdAt)}</p>
@@ -502,7 +725,7 @@ function changeLanguage(language) {
   if (elements.dialog.open && state.bookDetail) {
     renderBookDetail(state.bookDetail.book, state.bookDetail.annotations);
   }
-  Promise.all([loadSummary(), loadReview(), loadBooks()]).catch((error) => showToast(error.message));
+  Promise.all([loadSummary().then(loadYearReport), loadReview(), loadBooks(), loadAnnotations()]).catch((error) => showToast(error.message));
 }
 
 function closeBookDialog() {
@@ -530,6 +753,24 @@ elements.statusFilters.forEach((button) => button.addEventListener('click', () =
 elements.languageButtons.forEach((button) => button.addEventListener('click', () => changeLanguage(button.dataset.language)));
 elements.newReview.addEventListener('click', () => loadReview(newReviewKey()));
 elements.reviewNotesOnly.addEventListener('change', () => loadReview());
+elements.pickBook.addEventListener('click', pickBook);
+elements.reportYear.addEventListener('change', loadYearReport);
+elements.annotationSearch.addEventListener('input', () => {
+  window.clearTimeout(state.annotationSearchTimer);
+  state.annotationSearchTimer = window.setTimeout(() => { state.annotationOffset = 0; loadAnnotations(); }, 250);
+});
+elements.annotationKind.addEventListener('change', () => { state.annotationOffset = 0; loadAnnotations(); });
+elements.annotationStyle.addEventListener('change', () => { state.annotationOffset = 0; loadAnnotations(); });
+elements.annotationPrevious.addEventListener('click', () => {
+  state.annotationOffset = Math.max(0, state.annotationOffset - state.annotationLimit);
+  loadAnnotations();
+  document.querySelector('.annotation-search-section').scrollIntoView({ behavior: 'smooth' });
+});
+elements.annotationNext.addEventListener('click', () => {
+  state.annotationOffset += state.annotationLimit;
+  loadAnnotations();
+  document.querySelector('.annotation-search-section').scrollIntoView({ behavior: 'smooth' });
+});
 elements.previous.addEventListener('click', () => { state.offset = Math.max(0, state.offset - state.limit); loadBooks(); scrollToLibrary(); });
 elements.next.addEventListener('click', () => { state.offset += state.limit; loadBooks(); scrollToLibrary(); });
 document.querySelector('#dialog-close').addEventListener('click', closeBookDialog);
@@ -538,4 +779,4 @@ elements.dialog.addEventListener('click', (event) => { if (event.target === elem
 function scrollToLibrary() { document.querySelector('.library-section').scrollIntoView({ behavior: 'smooth' }); }
 
 applyStaticTranslations();
-Promise.all([loadSummary(), loadReview(), loadBooks()]).catch((error) => showToast(error.message));
+Promise.all([loadSummary().then(loadYearReport), loadReview(), loadBooks(), loadAnnotations()]).catch((error) => showToast(error.message));
