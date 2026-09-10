@@ -96,8 +96,8 @@ func (s *Store) Summary(ctx context.Context) (domain.Summary, error) {
 	bookQuery := `
 		SELECT COUNT(*),
 		       COALESCE(SUM(CASE WHEN COALESCE(ZREADINGPROGRESS, 0) > 0 THEN 1 ELSE 0 END), 0),
-		       COALESCE(SUM(CASE WHEN COALESCE(ZREADINGPROGRESS, 0) > 0 AND COALESCE(ZISFINISHED, 0) <> 1 AND ZDATEFINISHED IS NULL THEN 1 ELSE 0 END), 0),
-		       COALESCE(SUM(CASE WHEN COALESCE(ZISFINISHED, 0) = 1 OR ZDATEFINISHED IS NOT NULL THEN 1 ELSE 0 END), 0)
+		       COALESCE(SUM(CASE WHEN COALESCE(ZREADINGPROGRESS, 0) > 0 AND COALESCE(ZISFINISHED, 0) <> 1 THEN 1 ELSE 0 END), 0),
+		       COALESCE(SUM(CASE WHEN COALESCE(ZISFINISHED, 0) = 1 THEN 1 ELSE 0 END), 0)
 		FROM ZBKLIBRARYASSET`
 	if err := s.library.QueryRowContext(ctx, bookQuery).Scan(
 		&summary.TotalBooks, &summary.StartedBooks, &summary.ReadingBooks, &summary.FinishedBooks,
@@ -132,7 +132,11 @@ func (s *Store) Summary(ctx context.Context) (domain.Summary, error) {
 }
 
 func (s *Store) finishedYears(ctx context.Context) ([]domain.FinishedYear, error) {
-	rows, err := s.library.QueryContext(ctx, "SELECT ZDATEFINISHED FROM ZBKLIBRARYASSET WHERE ZDATEFINISHED IS NOT NULL")
+	rows, err := s.library.QueryContext(ctx, `
+		SELECT ZDATEFINISHED
+		FROM ZBKLIBRARYASSET
+		WHERE COALESCE(ZISFINISHED, 0) = 1
+		  AND ZDATEFINISHED IS NOT NULL`)
 	if err != nil {
 		return nil, fmt.Errorf("query finished years: %w", err)
 	}
@@ -310,16 +314,16 @@ func bookFilters(query domain.BookQuery) (string, []any) {
 	}
 	switch query.Status {
 	case "unread":
-		clauses = append(clauses, "COALESCE(ZREADINGPROGRESS, 0) = 0 AND COALESCE(ZISFINISHED, 0) <> 1 AND ZDATEFINISHED IS NULL")
+		clauses = append(clauses, "COALESCE(ZREADINGPROGRESS, 0) = 0 AND COALESCE(ZISFINISHED, 0) <> 1")
 	case "reading":
-		clauses = append(clauses, "COALESCE(ZREADINGPROGRESS, 0) > 0 AND COALESCE(ZISFINISHED, 0) <> 1 AND ZDATEFINISHED IS NULL")
+		clauses = append(clauses, "COALESCE(ZREADINGPROGRESS, 0) > 0 AND COALESCE(ZISFINISHED, 0) <> 1")
 	case "finished":
-		clauses = append(clauses, "(COALESCE(ZISFINISHED, 0) = 1 OR ZDATEFINISHED IS NOT NULL)")
+		clauses = append(clauses, "COALESCE(ZISFINISHED, 0) = 1")
 	}
 	if query.FinishedYear > 0 {
 		start := time.Date(query.FinishedYear, time.January, 1, 0, 0, 0, 0, time.Local).Unix() - appleEpochOffset
 		end := time.Date(query.FinishedYear+1, time.January, 1, 0, 0, 0, 0, time.Local).Unix() - appleEpochOffset
-		clauses = append(clauses, "ZDATEFINISHED >= ? AND ZDATEFINISHED < ?")
+		clauses = append(clauses, "COALESCE(ZISFINISHED, 0) = 1 AND ZDATEFINISHED >= ? AND ZDATEFINISHED < ?")
 		arguments = append(arguments, start, end)
 	}
 	if query.CollectionYear > 0 {
@@ -360,11 +364,11 @@ func scanBook(row scanner) (domain.Book, error) {
 	}
 	book.LastOpenedAt = appleTime(lastOpened)
 	book.LastEngagedAt = appleTime(lastEngaged)
-	book.FinishedAt = appleTime(finishedAt)
 	book.CollectedAt, book.CollectionSource = earliestCollectionTime(purchaseDate, recordDate, creationDate)
 	switch {
-	case finished == 1 || finishedAt.Valid:
+	case finished == 1:
 		book.Status = "finished"
+		book.FinishedAt = appleTime(finishedAt)
 	case book.Progress > 0:
 		book.Status = "reading"
 	default:
@@ -445,10 +449,10 @@ func (s *Store) RandomBook(ctx context.Context, key, mode string) (domain.Book, 
 	where := ""
 	switch mode {
 	case "unread":
-		where = "WHERE COALESCE(ZREADINGPROGRESS, 0) = 0 AND COALESCE(ZISFINISHED, 0) <> 1 AND ZDATEFINISHED IS NULL"
+		where = "WHERE COALESCE(ZREADINGPROGRESS, 0) = 0 AND COALESCE(ZISFINISHED, 0) <> 1"
 	case "stalled":
 		cutoff := time.Now().AddDate(0, 0, -90).Unix() - appleEpochOffset
-		where = "WHERE COALESCE(ZREADINGPROGRESS, 0) > 0 AND COALESCE(ZISFINISHED, 0) <> 1 AND ZDATEFINISHED IS NULL AND (ZLASTOPENDATE IS NULL OR ZLASTOPENDATE < ?)"
+		where = "WHERE COALESCE(ZREADINGPROGRESS, 0) > 0 AND COALESCE(ZISFINISHED, 0) <> 1 AND (ZLASTOPENDATE IS NULL OR ZLASTOPENDATE < ?)"
 		return s.randomBookWithArguments(ctx, key, where, cutoff)
 	}
 	return s.randomBookWithArguments(ctx, key, where)
@@ -714,7 +718,7 @@ func (s *Store) YearReport(ctx context.Context, year int) (domain.YearReport, er
 		return domain.YearReport{}, fmt.Errorf("count collected books for year report: %w", err)
 	}
 	if err := s.library.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM ZBKLIBRARYASSET WHERE ZDATEFINISHED >= ? AND ZDATEFINISHED < ?", start, end,
+		"SELECT COUNT(*) FROM ZBKLIBRARYASSET WHERE COALESCE(ZISFINISHED, 0) = 1 AND ZDATEFINISHED >= ? AND ZDATEFINISHED < ?", start, end,
 	).Scan(&report.FinishedBooks); err != nil {
 		return domain.YearReport{}, fmt.Errorf("count finished books for year report: %w", err)
 	}

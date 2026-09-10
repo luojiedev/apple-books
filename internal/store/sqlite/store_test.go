@@ -169,6 +169,64 @@ func TestStoreReadsBooksAndUserAnnotations(t *testing.T) {
 	}
 }
 
+func TestStoreDoesNotTreatFinishedDateAsFinishedStatus(t *testing.T) {
+	directory := t.TempDir()
+	libraryPath := filepath.Join(directory, "library.sqlite")
+	annotationPath := filepath.Join(directory, "annotations.sqlite")
+	createLibraryFixture(t, libraryPath)
+	createAnnotationFixture(t, annotationPath)
+
+	database := openFixture(t, libraryPath)
+	mustExec(t, database, `INSERT INTO ZBKLIBRARYASSET VALUES
+		(3, 'asset-3', '存在完成日期的在读书', '作者丙', '', 'zh', '', 0.2, 0, 700000000, 700000100, 700000100, 0, NULL, 700000000, NULL, '')`)
+	if err := database.Close(); err != nil {
+		t.Fatalf("close library fixture: %v", err)
+	}
+
+	reader, err := Open(libraryPath, annotationPath)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	t.Cleanup(func() { _ = reader.Close() })
+
+	summary, err := reader.Summary(context.Background())
+	if err != nil {
+		t.Fatalf("Summary() error = %v", err)
+	}
+	if summary.FinishedBooks != 1 || summary.ReadingBooks != 2 {
+		t.Fatalf("unexpected summary for unfinished book with finished date: %+v", summary)
+	}
+	if len(summary.FinishedYears) != 1 || summary.FinishedYears[0].Count != 1 {
+		t.Fatalf("unexpected finished years: %+v", summary.FinishedYears)
+	}
+
+	book, err := reader.Book(context.Background(), 3)
+	if err != nil {
+		t.Fatalf("Book() error = %v", err)
+	}
+	if book.Status != "reading" || book.FinishedAt != nil {
+		t.Fatalf("book with unset finished flag = %+v, want reading without finished time", book)
+	}
+
+	finishedPage, err := reader.Books(context.Background(), domain.BookQuery{
+		FinishedYear: summary.FinishedYears[0].Year, Limit: 10,
+	})
+	if err != nil {
+		t.Fatalf("Books() by finished year error = %v", err)
+	}
+	if finishedPage.Total != 1 || len(finishedPage.Items) != 1 || finishedPage.Items[0].Title != "读完的书" {
+		t.Fatalf("unexpected finished books: %+v", finishedPage)
+	}
+
+	report, err := reader.YearReport(context.Background(), summary.FinishedYears[0].Year)
+	if err != nil {
+		t.Fatalf("YearReport() error = %v", err)
+	}
+	if report.FinishedBooks != 1 {
+		t.Fatalf("finished books in year report = %d, want 1", report.FinishedBooks)
+	}
+}
+
 func createLibraryFixture(t *testing.T, path string) {
 	t.Helper()
 	database := openFixture(t, path)
