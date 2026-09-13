@@ -534,6 +534,55 @@ func (s *Store) bookByAssetID(ctx context.Context, assetID string) (domain.Book,
 	return books[0], nil
 }
 
+// booksByAssetIDs batch-fetches books for the given asset IDs in a single
+// query, avoiding an N+1 lookup when resolving many annotations at once.
+func (s *Store) booksByAssetIDs(ctx context.Context, assetIDs []string) (map[string]domain.Book, error) {
+	unique := make(map[string]struct{}, len(assetIDs))
+	placeholders := make([]string, 0, len(assetIDs))
+	arguments := make([]any, 0, len(assetIDs))
+	for _, assetID := range assetIDs {
+		if assetID == "" {
+			continue
+		}
+		if _, seen := unique[assetID]; seen {
+			continue
+		}
+		unique[assetID] = struct{}{}
+		placeholders = append(placeholders, "?")
+		arguments = append(arguments, assetID)
+	}
+	if len(arguments) == 0 {
+		return map[string]domain.Book{}, nil
+	}
+
+	rows, err := s.library.QueryContext(ctx, bookSelect+" WHERE ZASSETID IN ("+strings.Join(placeholders, ",")+")", arguments...)
+	if err != nil {
+		return nil, fmt.Errorf("query books by asset id: %w", err)
+	}
+	defer rows.Close()
+
+	books := make([]domain.Book, 0, len(arguments))
+	for rows.Next() {
+		book, err := scanBook(rows)
+		if err != nil {
+			return nil, err
+		}
+		books = append(books, book)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate books by asset id: %w", err)
+	}
+	if err := s.addAnnotationCounts(ctx, books); err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]domain.Book, len(books))
+	for _, book := range books {
+		result[book.AssetID] = book
+	}
+	return result, nil
+}
+
 func (s *Store) addAnnotationCounts(ctx context.Context, books []domain.Book) error {
 	if len(books) == 0 {
 		return nil
@@ -665,14 +714,20 @@ func (s *Store) SearchAnnotations(ctx context.Context, query domain.AnnotationQu
 		return domain.AnnotationPage{}, fmt.Errorf("iterate annotation search results: %w", err)
 	}
 
+	assetIDs := make([]string, len(matches))
+	for index, match := range matches {
+		assetIDs[index] = match.assetID
+	}
+	books, err := s.booksByAssetIDs(ctx, assetIDs)
+	if err != nil {
+		return domain.AnnotationPage{}, err
+	}
+
 	items := make([]domain.AnnotationResult, 0, len(matches))
 	for _, match := range matches {
-		book, err := s.bookByAssetID(ctx, match.assetID)
-		if errors.Is(err, store.ErrNotFound) {
+		book, exists := books[match.assetID]
+		if !exists {
 			continue
-		}
-		if err != nil {
-			return domain.AnnotationPage{}, err
 		}
 		items = append(items, domain.AnnotationResult{Book: book, Annotation: match.annotation})
 	}
@@ -769,13 +824,19 @@ func (s *Store) YearReport(ctx context.Context, year int) (domain.YearReport, er
 		ranked = append(ranked, bookCount{assetID: assetID, count: count})
 	}
 	sort.Slice(ranked, func(left, right int) bool { return ranked[left].count > ranked[right].count })
+
+	assetIDs := make([]string, len(ranked))
+	for index, item := range ranked {
+		assetIDs[index] = item.assetID
+	}
+	books, err := s.booksByAssetIDs(ctx, assetIDs)
+	if err != nil {
+		return domain.YearReport{}, err
+	}
 	for _, item := range ranked {
-		book, err := s.bookByAssetID(ctx, item.assetID)
-		if errors.Is(err, store.ErrNotFound) {
+		book, exists := books[item.assetID]
+		if !exists {
 			continue
-		}
-		if err != nil {
-			return domain.YearReport{}, err
 		}
 		report.TopBooks = append(report.TopBooks, domain.ReportBook{Book: book, AnnotationCount: item.count})
 		if len(report.TopBooks) == 5 {

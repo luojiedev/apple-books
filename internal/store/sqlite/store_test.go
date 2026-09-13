@@ -227,6 +227,81 @@ func TestStoreDoesNotTreatFinishedDateAsFinishedStatus(t *testing.T) {
 	}
 }
 
+func TestSearchAnnotationsAndYearReportResolveMultipleBooksInBatch(t *testing.T) {
+	directory := t.TempDir()
+	libraryPath := filepath.Join(directory, "library.sqlite")
+	annotationPath := filepath.Join(directory, "annotations.sqlite")
+
+	database := openFixture(t, libraryPath)
+	mustExec(t, database, `CREATE TABLE ZBKLIBRARYASSET (
+		Z_PK INTEGER PRIMARY KEY, ZASSETID TEXT, ZTITLE TEXT, ZAUTHOR TEXT, ZGENRE TEXT,
+		ZLANGUAGE TEXT, ZBOOKDESCRIPTION TEXT, ZREADINGPROGRESS REAL, ZISFINISHED INTEGER,
+		ZLASTOPENDATE REAL, ZLASTENGAGEDDATE REAL, ZDATEFINISHED REAL, ZPAGECOUNT INTEGER,
+		ZPURCHASEDATE REAL, ZCREATIONDATE REAL, ZUPDATEDATE REAL, ZPATH TEXT
+	)`)
+	mustExec(t, database, `INSERT INTO ZBKLIBRARYASSET VALUES
+		(1, 'asset-a', '书A', '作者A', '', 'zh', '', 0.5, 0, 800000000, 800000000, NULL, 0, 800000000, 800000000, NULL, ''),
+		(2, 'asset-b', '书B', '作者B', '', 'zh', '', 0.5, 0, 800000000, 800000000, NULL, 0, 800000000, 800000000, NULL, '')`)
+	mustExec(t, database, `CREATE TABLE ZBKCOLLECTION (Z_PK INTEGER PRIMARY KEY, ZCOLLECTIONID TEXT)`)
+	mustExec(t, database, `CREATE TABLE ZBKCOLLECTIONMEMBER (Z_PK INTEGER PRIMARY KEY, ZSORTKEY INTEGER, ZASSET INTEGER, ZCOLLECTION INTEGER)`)
+	if err := database.Close(); err != nil {
+		t.Fatalf("close library fixture: %v", err)
+	}
+
+	annotationDatabase := openFixture(t, annotationPath)
+	mustExec(t, annotationDatabase, `CREATE TABLE ZAEANNOTATION (
+		Z_PK INTEGER PRIMARY KEY, ZANNOTATIONUUID TEXT, ZANNOTATIONTYPE INTEGER,
+		ZANNOTATIONSTYLE INTEGER, ZANNOTATIONISUNDERLINE INTEGER, ZANNOTATIONSELECTEDTEXT TEXT,
+		ZANNOTATIONNOTE TEXT, ZANNOTATIONLOCATION TEXT, ZANNOTATIONCREATIONDATE REAL,
+		ZANNOTATIONMODIFICATIONDATE REAL, ZANNOTATIONASSETID TEXT, ZANNOTATIONDELETED INTEGER
+	)`)
+	mustExec(t, annotationDatabase, `INSERT INTO ZAEANNOTATION VALUES
+		(1, 'note-a1', 2, 0, 0, '共同摘录', '', 'loc-a1', 800000010, 800000010, 'asset-a', 0),
+		(2, 'note-a2', 2, 0, 0, '共同摘录二', '', 'loc-a2', 800000020, 800000020, 'asset-a', 0),
+		(3, 'note-b1', 2, 0, 0, '共同摘录', '', 'loc-b1', 800000030, 800000030, 'asset-b', 0),
+		(4, 'note-orphan', 2, 0, 0, '共同摘录', '', 'loc-orphan', 800000040, 800000040, 'asset-missing', 0)`)
+	if err := annotationDatabase.Close(); err != nil {
+		t.Fatalf("close annotation fixture: %v", err)
+	}
+
+	reader, err := Open(libraryPath, annotationPath)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	t.Cleanup(func() { _ = reader.Close() })
+
+	page, err := reader.SearchAnnotations(context.Background(), domain.AnnotationQuery{Search: "共同摘录", Limit: 10})
+	if err != nil {
+		t.Fatalf("SearchAnnotations() error = %v", err)
+	}
+	if page.Total != 4 {
+		t.Fatalf("SearchAnnotations() total = %d, want 4 (including the orphaned annotation)", page.Total)
+	}
+	if len(page.Items) != 3 {
+		t.Fatalf("SearchAnnotations() should drop the annotation whose book no longer exists, got %d items", len(page.Items))
+	}
+	if page.Items[0].Book.Title != "书B" || page.Items[1].Book.Title != "书A" || page.Items[2].Book.Title != "书A" {
+		t.Fatalf("unexpected book resolution/order for search results: %+v", page.Items)
+	}
+
+	report, err := reader.YearReport(context.Background(), appleTime(sql.NullFloat64{Float64: 800000010, Valid: true}).Year())
+	if err != nil {
+		t.Fatalf("YearReport() error = %v", err)
+	}
+	if report.AnnotationCount != 4 {
+		t.Fatalf("YearReport() annotation count = %d, want 4", report.AnnotationCount)
+	}
+	if len(report.TopBooks) != 2 {
+		t.Fatalf("YearReport() should only rank books that still exist in the library, got %+v", report.TopBooks)
+	}
+	if report.TopBooks[0].Book.Title != "书A" || report.TopBooks[0].AnnotationCount != 2 {
+		t.Fatalf("unexpected top book ranking: %+v", report.TopBooks)
+	}
+	if report.TopBooks[1].Book.Title != "书B" || report.TopBooks[1].AnnotationCount != 1 {
+		t.Fatalf("unexpected top book ranking: %+v", report.TopBooks)
+	}
+}
+
 func createLibraryFixture(t *testing.T, path string) {
 	t.Helper()
 	database := openFixture(t, path)
