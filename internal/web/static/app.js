@@ -540,15 +540,19 @@ async function loadYearReport() {
 
 function renderYearReport(report) {
   const maximum = Math.max(1, ...report.months.map((month) => month.annotationCount));
+  const scaledMaximum = Math.sqrt(maximum);
   const monthFormatter = new Intl.DateTimeFormat(displayLocale(), { month: 'short' });
   const bars = report.months.map((month) => {
     const label = monthFormatter.format(new Date(report.year, month.month - 1, 1));
-    const height = Math.max(3, Math.round((month.annotationCount / maximum) * 64));
+    // Square-root scale keeps small counts visible even when one month spikes far above the rest;
+    // zero stays at height 0 instead of sharing the non-zero floor so it never looks like real data.
+    const height = month.annotationCount === 0 ? 0 : Math.max(4, Math.round((Math.sqrt(month.annotationCount) / scaledMaximum) * 64));
     const top = 64 - height;
     const accessibleLabel = `${label}: ${month.annotationCount}`;
     return `<div class="month-bar">
+      <span class="month-value">${month.annotationCount}</span>
       <svg class="month-column" viewBox="0 0 20 64" role="img" aria-label="${escapeHTML(accessibleLabel)}">
-        <title>${escapeHTML(accessibleLabel)}</title><rect x="0" y="${top}" width="20" height="${height}" rx="3"></rect>
+        <title>${escapeHTML(accessibleLabel)}</title>${height > 0 ? `<rect x="0" y="${top}" width="20" height="${height}" rx="3"></rect>` : ''}
       </svg>
       <small>${escapeHTML(label)}</small>
     </div>`;

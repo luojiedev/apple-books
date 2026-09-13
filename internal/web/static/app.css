@@ -113,8 +113,9 @@ h1 { margin: 0; font-size: clamp(24px, 2.6vw, 32px); font-weight: 700; line-heig
 .report-metrics strong { font-size: 22px; }
 .report-metrics span { margin-top: 4px; color: var(--muted); font-size: 10px; }
 .report-content h3 { margin: 20px 0 10px; font-size: 12px; color: var(--muted); font-weight: 600; }
-.month-chart { height: 90px; display: grid; grid-template-columns: repeat(12, 1fr); align-items: end; gap: 5px; }
-.month-bar { height: 90px; display: flex; flex-direction: column; justify-content: end; align-items: center; gap: 6px; }
+.month-chart { height: 104px; display: grid; grid-template-columns: repeat(12, 1fr); align-items: end; gap: 5px; }
+.month-bar { height: 104px; display: flex; flex-direction: column; justify-content: end; align-items: center; gap: 4px; }
+.month-value { color: var(--muted); font-size: 9px; line-height: 1; }
 .month-column { width: min(20px, 70%); height: 64px; overflow: visible; }
 .month-column rect { fill: var(--accent); }
 .month-bar small { color: var(--muted); font-size: 9px; white-space: nowrap; }
