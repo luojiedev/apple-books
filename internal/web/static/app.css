@@ -107,7 +107,7 @@ h1 { margin: 0; font-size: clamp(24px, 2.6vw, 32px); font-weight: 700; line-heig
 .report-heading { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
 .report-heading select { width: 100px; }
 .report-content > p { color: var(--muted); }
-.report-metrics { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 22px 0; }
+.report-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(82px, 1fr)); gap: 8px; margin: 22px 0; }
 .report-metrics div { padding: 13px 10px; border-radius: 10px; background: #f7f7f9; text-align: center; }
 .report-metrics strong, .report-metrics span { display: block; }
 .report-metrics strong { font-size: 22px; }
@@ -118,12 +118,14 @@ h1 { margin: 0; font-size: clamp(24px, 2.6vw, 32px); font-weight: 700; line-heig
 .month-value { color: var(--muted); font-size: 9px; line-height: 1; }
 .month-column { width: min(20px, 70%); height: 64px; overflow: visible; }
 .month-column rect { fill: var(--accent); }
+.reading-chart .month-column rect { fill: var(--green); }
 .month-bar small { color: var(--muted); font-size: 9px; white-space: nowrap; }
 .report-ranking { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; }
 .report-ranking button { min-width: 0; width: 100%; display: flex; justify-content: space-between; gap: 12px; border: 0; padding: 5px 0; color: var(--ink); background: none; text-align: left; font-size: 11px; }
 .report-ranking button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .report-ranking button strong { color: var(--accent); }
 .report-empty { color: var(--muted); font-size: 11px; }
+.report-warning { padding: 10px 12px; border-radius: 8px; background: var(--accent-soft); color: var(--accent-dark) !important; font-size: 11px; line-height: 1.5; }
 
 .annotation-search-section { margin-bottom: 64px; }
 .want-to-read-section { margin-bottom: 64px; }

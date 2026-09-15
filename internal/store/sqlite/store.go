@@ -13,7 +13,10 @@ import (
 	"time"
 
 	"apple-books/internal/domain"
+	"apple-books/internal/readinghistory"
 	"apple-books/internal/store"
+
+	log "github.com/luojiedev/slogx"
 
 	_ "modernc.org/sqlite"
 )
@@ -24,9 +27,10 @@ const wantToReadCollectionID = "Want_To_Read_Collection_ID"
 type Store struct {
 	library    *sql.DB
 	annotation *sql.DB
+	history    *readinghistory.Reader
 }
 
-func Open(libraryPath, annotationPath string) (*Store, error) {
+func Open(libraryPath, annotationPath string, readingHistoryPath ...string) (*Store, error) {
 	library, err := openReadOnly(libraryPath)
 	if err != nil {
 		return nil, fmt.Errorf("open library database: %w", err)
@@ -38,6 +42,13 @@ func Open(libraryPath, annotationPath string) (*Store, error) {
 	}
 
 	store := &Store{library: library, annotation: annotation}
+	if len(readingHistoryPath) > 0 && readingHistoryPath[0] != "" {
+		store.history, err = readinghistory.Open(readingHistoryPath[0])
+		if err != nil {
+			_ = store.Close()
+			return nil, fmt.Errorf("open reading history database: %w", err)
+		}
+	}
 	if err := store.validateSchema(context.Background()); err != nil {
 		_ = store.Close()
 		return nil, err
@@ -88,7 +99,11 @@ func (s *Store) validateSchema(ctx context.Context) error {
 }
 
 func (s *Store) Close() error {
-	return errors.Join(s.library.Close(), s.annotation.Close())
+	var historyError error
+	if s.history != nil {
+		historyError = s.history.Close()
+	}
+	return errors.Join(s.library.Close(), s.annotation.Close(), historyError)
 }
 
 func (s *Store) Summary(ctx context.Context) (domain.Summary, error) {
@@ -128,6 +143,15 @@ func (s *Store) Summary(ctx context.Context) (domain.Summary, error) {
 		return domain.Summary{}, err
 	}
 	summary.CollectionYears = collectionYears
+	if s.history != nil {
+		summary.ReadingYears, err = s.history.Years(ctx)
+		if err != nil {
+			summary.ReadingTimeError = err.Error()
+			log.Error("read Apple Books reading history years failed", "error", err)
+		} else {
+			log.Debug("Apple Books reading history years loaded", "years", summary.ReadingYears)
+		}
+	}
 	return summary, nil
 }
 
@@ -814,6 +838,20 @@ func (s *Store) YearReport(ctx context.Context, year int) (domain.YearReport, er
 		return domain.YearReport{}, fmt.Errorf("iterate year report annotations: %w", err)
 	}
 	report.ActiveDays = len(activeDates)
+	if s.history != nil {
+		readingYear, historyErr := s.history.Year(ctx, year)
+		if historyErr != nil {
+			report.ReadingTimeError = historyErr.Error()
+			log.Error("read Apple Books annual reading time failed", "year", year, "error", historyErr)
+		} else {
+			report.ReadingTimeAvailable = true
+			report.ReadingSeconds = readingYear.Seconds
+			for month, readingMonth := range readingYear.Months {
+				report.Months[month].ReadingSeconds = readingMonth.Seconds
+			}
+			log.Debug("Apple Books annual reading time loaded", "year", year, "seconds", readingYear.Seconds)
+		}
+	}
 
 	type bookCount struct {
 		assetID string

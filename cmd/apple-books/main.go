@@ -22,9 +22,9 @@ func main() {
 	if err != nil {
 		log.Fatal("configuration validation failed", "error", err)
 	}
-	log.Debug("Apple Books databases selected", "library_db", filepath.Base(configuration.LibraryDB), "annotation_db", filepath.Base(configuration.AnnotationDB))
+	log.Debug("Apple Books databases selected", "library_db", filepath.Base(configuration.LibraryDB), "annotation_db", filepath.Base(configuration.AnnotationDB), "reading_history_db", filepath.Base(configuration.ReadingHistoryDB))
 
-	reader, err := booksdb.Open(configuration.LibraryDB, configuration.AnnotationDB)
+	reader, err := booksdb.Open(configuration.LibraryDB, configuration.AnnotationDB, configuration.ReadingHistoryDB)
 	if err != nil {
 		log.Fatal("open Apple Books databases failed", "error", err)
 	}

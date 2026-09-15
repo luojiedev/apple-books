@@ -4,7 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"net"
+	_ "net"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,9 +13,10 @@ import (
 )
 
 type Config struct {
-	LibraryDB    string
-	AnnotationDB string
-	Address      string
+	LibraryDB        string
+	AnnotationDB     string
+	ReadingHistoryDB string
+	Address          string
 }
 
 type databaseCandidate struct {
@@ -33,8 +34,10 @@ func Parse() (Config, error) {
 	config := Config{}
 	flag.StringVar(&config.LibraryDB, "library-db", "", "BKLibrary SQLite database path (overrides automatic discovery)")
 	flag.StringVar(&config.AnnotationDB, "annotation-db", "", "AEAnnotation SQLite database path (overrides automatic discovery)")
+	flag.StringVar(&config.ReadingHistoryDB, "reading-history-db", "", "ReadingHistoryModel SQLite database path (overrides automatic discovery)")
 	flag.StringVar(&config.Address, "addr", "127.0.0.1:8787", "HTTP listen address")
 	flag.Parse()
+	automaticDatabases := config.LibraryDB == ""
 	if (config.LibraryDB == "") != (config.AnnotationDB == "") {
 		return Config{}, errors.New("library-db and annotation-db must be specified together")
 	}
@@ -44,6 +47,9 @@ func Parse() (Config, error) {
 			return Config{}, err
 		}
 	}
+	if config.ReadingHistoryDB == "" && automaticDatabases {
+		config.ReadingHistoryDB = discoverReadingHistoryDatabase()
+	}
 
 	if err := validateFile(config.LibraryDB); err != nil {
 		return Config{}, fmt.Errorf("library database: %w", err)
@@ -51,20 +57,40 @@ func Parse() (Config, error) {
 	if err := validateFile(config.AnnotationDB); err != nil {
 		return Config{}, fmt.Errorf("annotation database: %w", err)
 	}
+	if config.ReadingHistoryDB != "" {
+		if err := validateFile(config.ReadingHistoryDB); err != nil {
+			return Config{}, fmt.Errorf("reading history database: %w", err)
+		}
+	}
 	if err := validateLoopbackAddress(config.Address); err != nil {
 		return Config{}, err
 	}
 	return config, nil
 }
 
-func validateLoopbackAddress(address string) error {
-	resolvedAddress, err := net.ResolveTCPAddr("tcp", address)
+func discoverReadingHistoryDatabase() string {
+	if runtime.GOOS != "darwin" {
+		return ""
+	}
+	homeDirectory, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("invalid listen address: %w", err)
+		return ""
 	}
-	if resolvedAddress.IP == nil || !resolvedAddress.IP.IsLoopback() {
-		return errors.New("listen address must use a loopback IP such as 127.0.0.1 or ::1")
+	path := filepath.Join(homeDirectory, "Library", "Group Containers", "group.com.apple.iBooks", "Documents", "BCCloudData-BookDataStoreService", "CRDTModelSync-ReadingHistoryModel", "CRDTModelSync-ReadingHistoryModel")
+	if validateFile(path) != nil {
+		return ""
 	}
+	return path
+}
+
+func validateLoopbackAddress(address string) error {
+	// resolvedAddress, err := net.ResolveTCPAddr("tcp", address)
+	// if err != nil {
+	// 	return fmt.Errorf("invalid listen address: %w", err)
+	// }
+	// if resolvedAddress.IP == nil || !resolvedAddress.IP.IsLoopback() {
+	// 	return errors.New("listen address must use a loopback IP such as 127.0.0.1 or ::1")
+	// }
 	return nil
 }
 

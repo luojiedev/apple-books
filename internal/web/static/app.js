@@ -12,6 +12,7 @@ const state = {
   wantToReadTotal: 0,
   finishedYears: [],
   collectionYears: [],
+  readingYears: [],
   bookDetail: null,
   language: initialLanguage()
 };
@@ -53,6 +54,9 @@ const translations = {
     'report.annotations': '批注',
     'report.notes': '笔记',
     'report.activeDays': '批注活跃日',
+    'report.readingTime': '阅读时长',
+    'report.monthlyReading': '每月阅读时长',
+    'report.readingUnavailable': '暂时无法读取阅读时长：{error}',
     'report.monthly': '每月批注',
     'report.topBooks': '批注最多的书',
     'report.noTopBooks': '这一年还没有可排行的书籍批注。',
@@ -185,6 +189,9 @@ const translations = {
     'report.annotations': 'Annotations',
     'report.notes': 'Notes',
     'report.activeDays': 'Annotation days',
+    'report.readingTime': 'Reading time',
+    'report.monthlyReading': 'Monthly reading time',
+    'report.readingUnavailable': 'Reading time is unavailable: {error}',
     'report.monthly': 'Monthly annotations',
     'report.topBooks': 'Most annotated books',
     'report.noTopBooks': 'There are no ranked book annotations for this year.',
@@ -429,6 +436,7 @@ async function loadSummary() {
   });
   state.finishedYears = summary.finishedYears || [];
   state.collectionYears = summary.collectionYears || [];
+  state.readingYears = summary.readingYears || [];
   updateYearOptions();
   updateReportYears();
 }
@@ -438,6 +446,7 @@ function updateReportYears() {
   const years = new Set([new Date().getFullYear()]);
   state.finishedYears.forEach(({ year }) => years.add(year));
   state.collectionYears.forEach(({ year }) => years.add(year));
+  state.readingYears.forEach((year) => years.add(year));
   elements.reportYear.replaceChildren();
   [...years].sort((left, right) => right - left).forEach((year) => {
     const option = document.createElement('option');
@@ -539,24 +548,14 @@ async function loadYearReport() {
 }
 
 function renderYearReport(report) {
-  const maximum = Math.max(1, ...report.months.map((month) => month.annotationCount));
-  const scaledMaximum = Math.sqrt(maximum);
   const monthFormatter = new Intl.DateTimeFormat(displayLocale(), { month: 'short' });
-  const bars = report.months.map((month) => {
-    const label = monthFormatter.format(new Date(report.year, month.month - 1, 1));
-    // Square-root scale keeps small counts visible even when one month spikes far above the rest;
-    // zero stays at height 0 instead of sharing the non-zero floor so it never looks like real data.
-    const height = month.annotationCount === 0 ? 0 : Math.max(4, Math.round((Math.sqrt(month.annotationCount) / scaledMaximum) * 64));
-    const top = 64 - height;
-    const accessibleLabel = `${label}: ${month.annotationCount}`;
-    return `<div class="month-bar">
-      <span class="month-value">${month.annotationCount}</span>
-      <svg class="month-column" viewBox="0 0 20 64" role="img" aria-label="${escapeHTML(accessibleLabel)}">
-        <title>${escapeHTML(accessibleLabel)}</title>${height > 0 ? `<rect x="0" y="${top}" width="20" height="${height}" rx="3"></rect>` : ''}
-      </svg>
-      <small>${escapeHTML(label)}</small>
-    </div>`;
-  }).join('');
+  const annotationBars = renderMonthChart(report, 'annotationCount', (value) => value.toLocaleString(displayLocale()), monthFormatter);
+  const readingBars = renderMonthChart(report, 'readingSeconds', formatReadingTime, monthFormatter);
+  const readingMetrics = report.readingTimeAvailable ? `
+      <div><strong>${escapeHTML(formatReadingTime(report.readingSeconds))}</strong><span>${t('report.readingTime')}</span></div>` : '';
+  const readingSection = report.readingTimeAvailable
+    ? `<h3>${t('report.monthlyReading')}</h3><div class="month-chart reading-chart">${readingBars}</div>`
+    : (report.readingTimeError ? `<p class="report-warning">${escapeHTML(t('report.readingUnavailable', { error: report.readingTimeError }))}</p>` : '');
   const topBooks = report.topBooks.length
     ? report.topBooks.map((item, index) => `<button type="button" data-book-id="${item.book.id}"><span>${index + 1}. ${escapeHTML(item.book.title || t('book.untitled'))}</span><strong>${item.annotationCount}</strong></button>`).join('')
     : `<p class="report-empty">${t('report.noTopBooks')}</p>`;
@@ -567,10 +566,43 @@ function renderYearReport(report) {
       <div><strong>${report.annotationCount}</strong><span>${t('report.annotations')}</span></div>
       <div><strong>${report.noteCount}</strong><span>${t('report.notes')}</span></div>
       <div><strong>${report.activeDays}</strong><span>${t('report.activeDays')}</span></div>
+      ${readingMetrics}
     </div>
-    <h3>${t('report.monthly')}</h3><div class="month-chart">${bars}</div>
+    ${readingSection}
+    <h3>${t('report.monthly')}</h3><div class="month-chart">${annotationBars}</div>
     <h3>${t('report.topBooks')}</h3><div class="report-ranking">${topBooks}</div>`;
   elements.reportContent.querySelectorAll('[data-book-id]').forEach((button) => button.addEventListener('click', () => openBook(button.dataset.bookId)));
+}
+
+function renderMonthChart(report, field, formatValue, monthFormatter) {
+  const maximum = Math.max(1, ...report.months.map((month) => Number(month[field] || 0)));
+  const scaledMaximum = Math.sqrt(maximum);
+  return report.months.map((month) => {
+    const label = monthFormatter.format(new Date(report.year, month.month - 1, 1));
+    // Square-root scale keeps small counts visible even when one month spikes far above the rest;
+    // zero stays at height 0 instead of sharing the non-zero floor so it never looks like real data.
+    const value = Number(month[field] || 0);
+    const height = value === 0 ? 0 : Math.max(4, Math.round((Math.sqrt(value) / scaledMaximum) * 64));
+    const top = 64 - height;
+    const displayValue = formatValue(value);
+    const accessibleLabel = `${label}: ${displayValue}`;
+    return `<div class="month-bar">
+      <span class="month-value">${escapeHTML(displayValue)}</span>
+      <svg class="month-column" viewBox="0 0 20 64" role="img" aria-label="${escapeHTML(accessibleLabel)}">
+        <title>${escapeHTML(accessibleLabel)}</title>${height > 0 ? `<rect x="0" y="${top}" width="20" height="${height}" rx="3"></rect>` : ''}
+      </svg>
+      <small>${escapeHTML(label)}</small>
+    </div>`;
+  }).join('');
+}
+
+function formatReadingTime(seconds) {
+  const totalMinutes = Math.round(Number(seconds || 0) / 60);
+  if (totalMinutes < 60) return state.language === 'en' ? `${totalMinutes}m` : `${totalMinutes}分`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) return state.language === 'en' ? `${hours}h` : `${hours}小时`;
+  return state.language === 'en' ? `${hours}h ${minutes}m` : `${hours}小时${minutes}分`;
 }
 
 function annotationQueryParameters() {

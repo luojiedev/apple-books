@@ -19,13 +19,13 @@
 - 在整个书库中搜索高亮正文与笔记，并按批注类型和高亮颜色筛选
 - 在批注搜索区域下方浏览 Apple Books 的“欲读清单”
 - 分别调整批注、欲读清单和书库的每页数量，并在浏览器中记住选择
-- 生成年度阅读报告，查看收集、完成、批注活跃日、月度趋势和批注最多的书
+- 生成年度阅读报告，查看历史阅读时长、收集、完成、批注活跃日和月度趋势
 - 使用智能选书转盘，从未读、搁置或全部藏书中随机挑选下一本
 - 在批注列表和书籍详情中还原 Apple Books 高亮颜色
 - 页面支持中文与英文切换，并在浏览器中记住语言偏好
 - 所有数据仅在本机处理，页面不加载第三方资源
 
-Apple Books 的数据库没有保存可靠的累计阅读时长或完整阅读会话，因此本工具不会展示推测性的阅读时长。
+Apple Books 的 `ReadingHistoryModel` 保存了按日累计的阅读时长，本工具会用它统计年度和月度时长。它不包含完整的单次阅读会话或可靠的单书时长；较早月份的逐日明细也可能被 Apple 归档压缩，因此本工具不会推测这些数据或历史阅读天数。
 
 ## 环境要求
 
@@ -46,7 +46,10 @@ go run ./cmd/apple-books
 ```text
 ~/Library/Containers/com.apple.iBooksX/Data/Documents/BKLibrary/
 ~/Library/Containers/com.apple.iBooksX/Data/Documents/AEAnnotation/
+~/Library/Group Containers/group.com.apple.iBooks/Documents/BCCloudData-BookDataStoreService/CRDTModelSync-ReadingHistoryModel/
 ```
+
+阅读历史使用 Apple 的 CRDT 格式存在 SQLite 的 `ZCRDTMODELSYNCENTITY.ZPROTODATA` 中。当前支持 macOS 上已验证的 CRDT v4；遇到未知版本时，年度页会明确显示格式不支持，其他书库和批注功能仍可使用。
 
 然后访问：
 
@@ -87,13 +90,16 @@ Apple Books 会分别同步书籍元数据、电子书文件和批注。一本�
 无法或不希望授权直接访问时，可以使用数据库快照。建议先完全退出 Apple Books，再复制主数据库以及对应的 `-wal`、`-shm` 文件：
 
 ```bash
-mkdir -p BKLibrary AEAnnotation
+mkdir -p BKLibrary AEAnnotation ReadingHistory
 
 cp ~/Library/Containers/com.apple.iBooksX/Data/Documents/BKLibrary/*.sqlite* \
   ./BKLibrary/
 
 cp ~/Library/Containers/com.apple.iBooksX/Data/Documents/AEAnnotation/*.sqlite* \
   ./AEAnnotation/
+
+cp ~/Library/Group\ Containers/group.com.apple.iBooks/Documents/BCCloudData-BookDataStoreService/CRDTModelSync-ReadingHistoryModel/CRDTModelSync-ReadingHistoryModel* \
+  ./ReadingHistory/
 ```
 
 在 macOS 上，如果系统数据库仍可访问，自动发现会优先使用系统中的最新数据。要明确使用刚复制的快照，请同时指定两个数据库参数：
@@ -101,10 +107,11 @@ cp ~/Library/Containers/com.apple.iBooksX/Data/Documents/AEAnnotation/*.sqlite* 
 ```bash
 go run ./cmd/apple-books \
   -library-db "./BKLibrary/BKLibrary-1-091020131601.sqlite" \
-  -annotation-db "./AEAnnotation/AEAnnotation_v10312011_1727_local.sqlite"
+  -annotation-db "./AEAnnotation/AEAnnotation_v10312011_1727_local.sqlite" \
+  -reading-history-db "./ReadingHistory/CRDTModelSync-ReadingHistoryModel"
 ```
 
-文件名可能随 Apple Books 版本变化，请以实际复制出的 `.sqlite` 文件名为准。两个参数必须同时提供。
+文件名可能随 Apple Books 版本变化，请以实际复制出的文件名为准。书库和批注两个参数必须同时提供；阅读历史参数可选。
 
 也可以修改本机监听端口；为避免阅读数据暴露到局域网，程序只接受回环地址：
 

@@ -19,13 +19,13 @@ The project focuses first on its most important job: giving you a complete, port
 - Search highlight text and notes across the library, with annotation-type and highlight-color filters
 - Browse the Apple Books Want to Read collection below annotation search
 - Set independent page sizes for annotations, Want to Read, and the library, with choices remembered in the browser
-- Generate annual reports covering collected and finished books, annotation days, monthly activity, and most-annotated books
+- Generate annual reports covering historical reading time, collected and finished books, annotation days, and monthly activity
 - Pick the next book from unread, stalled, or all books with the book picker
 - Restore Apple Books highlight colors in annotation lists and book details
 - Switch the interface between Chinese and English, with the preference remembered in the browser
 - Process everything locally without loading third-party resources in the page
 
-Apple Books does not store reliable cumulative reading time or a complete history of reading sessions, so this tool does not display estimated reading duration.
+Apple Books stores daily cumulative reading time in `ReadingHistoryModel`, which this tool uses for annual and monthly totals. It does not contain complete individual sessions or reliable per-book duration, and Apple may compact older daily details, so the tool does not estimate those values or historical reading-day counts.
 
 ## Requirements
 
@@ -46,7 +46,10 @@ The application automatically finds the newest `.sqlite` files in:
 ```text
 ~/Library/Containers/com.apple.iBooksX/Data/Documents/BKLibrary/
 ~/Library/Containers/com.apple.iBooksX/Data/Documents/AEAnnotation/
+~/Library/Group Containers/group.com.apple.iBooks/Documents/BCCloudData-BookDataStoreService/CRDTModelSync-ReadingHistoryModel/
 ```
+
+Reading history uses Apple's CRDT format in the SQLite `ZCRDTMODELSYNCENTITY.ZPROTODATA` column. The currently verified macOS CRDT v4 format is supported. An unknown version is reported explicitly on the annual report while the library and annotation features remain usable.
 
 Then open:
 
@@ -87,13 +90,16 @@ The tool only needs read access and never needs permission to modify Apple Books
 If direct access is unavailable or you prefer not to grant it, you can work from database snapshots. Quit Apple Books completely before copying the main databases and their matching `-wal` and `-shm` files:
 
 ```bash
-mkdir -p BKLibrary AEAnnotation
+mkdir -p BKLibrary AEAnnotation ReadingHistory
 
 cp ~/Library/Containers/com.apple.iBooksX/Data/Documents/BKLibrary/*.sqlite* \
   ./BKLibrary/
 
 cp ~/Library/Containers/com.apple.iBooksX/Data/Documents/AEAnnotation/*.sqlite* \
   ./AEAnnotation/
+
+cp ~/Library/Group\ Containers/group.com.apple.iBooks/Documents/BCCloudData-BookDataStoreService/CRDTModelSync-ReadingHistoryModel/CRDTModelSync-ReadingHistoryModel* \
+  ./ReadingHistory/
 ```
 
 On macOS, automatic discovery prefers the latest system databases when they remain accessible. To explicitly use the snapshots you copied, provide both database flags:
@@ -101,10 +107,11 @@ On macOS, automatic discovery prefers the latest system databases when they rema
 ```bash
 go run ./cmd/apple-books \
   -library-db "./BKLibrary/BKLibrary-1-091020131601.sqlite" \
-  -annotation-db "./AEAnnotation/AEAnnotation_v10312011_1727_local.sqlite"
+  -annotation-db "./AEAnnotation/AEAnnotation_v10312011_1727_local.sqlite" \
+  -reading-history-db "./ReadingHistory/CRDTModelSync-ReadingHistoryModel"
 ```
 
-File names may vary between Apple Books versions, so use the actual `.sqlite` file names you copied. Both flags must be provided together.
+File names may vary between Apple Books versions, so use the files you actually copied. The library and annotation flags must be provided together; the reading-history flag is optional.
 
 You can also change the local listening port. To keep reading data off the local network, only loopback addresses are accepted:
 

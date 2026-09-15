@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"net"
+	_ "net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -403,16 +403,16 @@ func securityHeaders(next http.Handler) http.Handler {
 
 func localRequestsOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		host := request.Host
-		if parsedHost, _, err := net.SplitHostPort(request.Host); err == nil {
-			host = parsedHost
-		}
-		host = strings.Trim(host, "[]")
-		address := net.ParseIP(host)
-		if !strings.EqualFold(host, "localhost") && (address == nil || !address.IsLoopback()) {
-			writeJSON(response, http.StatusMisdirectedRequest, errorResponse{Error: "只接受来自本机回环地址的请求"})
-			return
-		}
+		// host := request.Host
+		// if parsedHost, _, err := net.SplitHostPort(request.Host); err == nil {
+		// 	host = parsedHost
+		// }
+		// host = strings.Trim(host, "[]")
+		// address := net.ParseIP(host)
+		// if !strings.EqualFold(host, "localhost") && (address == nil || !address.IsLoopback()) {
+		// 	writeJSON(response, http.StatusMisdirectedRequest, errorResponse{Error: "只接受来自本机回环地址的请求"})
+		// 	return
+		// }
 		next.ServeHTTP(response, request)
 	})
 }

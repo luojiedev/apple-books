@@ -3,16 +3,18 @@ package domain
 import "time"
 
 type Summary struct {
-	TotalBooks      int64            `json:"totalBooks"`
-	StartedBooks    int64            `json:"startedBooks"`
-	ReadingBooks    int64            `json:"readingBooks"`
-	FinishedBooks   int64            `json:"finishedBooks"`
-	AnnotationCount int64            `json:"annotationCount"`
-	HighlightCount  int64            `json:"highlightCount"`
-	NoteCount       int64            `json:"noteCount"`
-	AnnotatedBooks  int64            `json:"annotatedBooks"`
-	FinishedYears   []FinishedYear   `json:"finishedYears"`
-	CollectionYears []CollectionYear `json:"collectionYears"`
+	TotalBooks       int64            `json:"totalBooks"`
+	StartedBooks     int64            `json:"startedBooks"`
+	ReadingBooks     int64            `json:"readingBooks"`
+	FinishedBooks    int64            `json:"finishedBooks"`
+	AnnotationCount  int64            `json:"annotationCount"`
+	HighlightCount   int64            `json:"highlightCount"`
+	NoteCount        int64            `json:"noteCount"`
+	AnnotatedBooks   int64            `json:"annotatedBooks"`
+	FinishedYears    []FinishedYear   `json:"finishedYears"`
+	CollectionYears  []CollectionYear `json:"collectionYears"`
+	ReadingYears     []int            `json:"readingYears"`
+	ReadingTimeError string           `json:"readingTimeError,omitempty"`
 }
 
 type FinishedYear struct {
@@ -90,6 +92,7 @@ type AnnotationPage struct {
 type MonthActivity struct {
 	Month           int   `json:"month"`
 	AnnotationCount int64 `json:"annotationCount"`
+	ReadingSeconds  int64 `json:"readingSeconds"`
 }
 
 type ReportBook struct {
@@ -98,14 +101,17 @@ type ReportBook struct {
 }
 
 type YearReport struct {
-	Year            int             `json:"year"`
-	CollectedBooks  int64           `json:"collectedBooks"`
-	FinishedBooks   int64           `json:"finishedBooks"`
-	AnnotationCount int64           `json:"annotationCount"`
-	NoteCount       int64           `json:"noteCount"`
-	ActiveDays      int             `json:"activeDays"`
-	Months          []MonthActivity `json:"months"`
-	TopBooks        []ReportBook    `json:"topBooks"`
+	Year                 int             `json:"year"`
+	CollectedBooks       int64           `json:"collectedBooks"`
+	FinishedBooks        int64           `json:"finishedBooks"`
+	AnnotationCount      int64           `json:"annotationCount"`
+	NoteCount            int64           `json:"noteCount"`
+	ActiveDays           int             `json:"activeDays"`
+	ReadingTimeAvailable bool            `json:"readingTimeAvailable"`
+	ReadingTimeError     string          `json:"readingTimeError,omitempty"`
+	ReadingSeconds       int64           `json:"readingSeconds"`
+	Months               []MonthActivity `json:"months"`
+	TopBooks             []ReportBook    `json:"topBooks"`
 }
 
 type BookQuery struct {
