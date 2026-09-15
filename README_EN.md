@@ -20,6 +20,7 @@ The project focuses first on its most important job: giving you a complete, port
 - Browse the Apple Books Want to Read collection below annotation search
 - Set independent page sizes for annotations, Want to Read, and the library, with choices remembered in the browser
 - Generate annual reports covering historical reading time, collected and finished books, annotation days, and monthly activity
+- Compare books finished, total reading time, and highlights/notes by year in one annual trend chart
 - Pick the next book from unread, stalled, or all books with the book picker
 - Restore Apple Books highlight colors in annotation lists and book details
 - Switch the interface between Chinese and English, with the preference remembered in the browser

@@ -3,18 +3,21 @@ package domain
 import "time"
 
 type Summary struct {
-	TotalBooks       int64            `json:"totalBooks"`
-	StartedBooks     int64            `json:"startedBooks"`
-	ReadingBooks     int64            `json:"readingBooks"`
-	FinishedBooks    int64            `json:"finishedBooks"`
-	AnnotationCount  int64            `json:"annotationCount"`
-	HighlightCount   int64            `json:"highlightCount"`
-	NoteCount        int64            `json:"noteCount"`
-	AnnotatedBooks   int64            `json:"annotatedBooks"`
-	FinishedYears    []FinishedYear   `json:"finishedYears"`
-	CollectionYears  []CollectionYear `json:"collectionYears"`
-	ReadingYears     []int            `json:"readingYears"`
-	ReadingTimeError string           `json:"readingTimeError,omitempty"`
+	TotalBooks           int64            `json:"totalBooks"`
+	StartedBooks         int64            `json:"startedBooks"`
+	ReadingBooks         int64            `json:"readingBooks"`
+	FinishedBooks        int64            `json:"finishedBooks"`
+	AnnotationCount      int64            `json:"annotationCount"`
+	HighlightCount       int64            `json:"highlightCount"`
+	NoteCount            int64            `json:"noteCount"`
+	AnnotatedBooks       int64            `json:"annotatedBooks"`
+	FinishedYears        []FinishedYear   `json:"finishedYears"`
+	CollectionYears      []CollectionYear `json:"collectionYears"`
+	AnnotationYears      []int            `json:"annotationYears"`
+	ReadingYears         []int            `json:"readingYears"`
+	ReadingTimeError     string           `json:"readingTimeError,omitempty"`
+	ReadingSeconds       int64            `json:"readingSeconds"`
+	ReadingTimeAvailable bool             `json:"readingTimeAvailable"`
 }
 
 type FinishedYear struct {
@@ -105,6 +108,7 @@ type YearReport struct {
 	CollectedBooks       int64           `json:"collectedBooks"`
 	FinishedBooks        int64           `json:"finishedBooks"`
 	AnnotationCount      int64           `json:"annotationCount"`
+	HighlightNoteCount   int64           `json:"highlightNoteCount"`
 	NoteCount            int64           `json:"noteCount"`
 	ActiveDays           int             `json:"activeDays"`
 	ReadingTimeAvailable bool            `json:"readingTimeAvailable"`

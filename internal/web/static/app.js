@@ -12,7 +12,9 @@ const state = {
   wantToReadTotal: 0,
   finishedYears: [],
   collectionYears: [],
+  annotationYears: [],
   readingYears: [],
+  annualReports: [],
   bookDetail: null,
   language: initialLanguage()
 };
@@ -60,6 +62,13 @@ const translations = {
     'report.monthly': '每月批注',
     'report.topBooks': '批注最多的书',
     'report.noTopBooks': '这一年还没有可排行的书籍批注。',
+    'trend.eyebrow': '长期轨迹',
+    'trend.title': '年度阅读趋势',
+    'trend.scaleNote': '各指标峰值 = 100% · 比较年度变化',
+    'trend.finished': '读完书籍',
+    'trend.readingTime': '阅读总时长',
+    'trend.annotations': '划线/笔记总数',
+    'trend.empty': '还没有足够的年度数据。',
     'annotationSearch.eyebrow': '思想索引',
     'annotationSearch.title': '搜索全部批注',
     'annotationSearch.label': '搜索批注',
@@ -195,6 +204,13 @@ const translations = {
     'report.monthly': 'Monthly annotations',
     'report.topBooks': 'Most annotated books',
     'report.noTopBooks': 'There are no ranked book annotations for this year.',
+    'trend.eyebrow': 'LONG-TERM VIEW',
+    'trend.title': 'Annual reading trends',
+    'trend.scaleNote': 'Each metric’s peak = 100% · Compare yearly changes',
+    'trend.finished': 'Books finished',
+    'trend.readingTime': 'Reading time',
+    'trend.annotations': 'Highlights / notes',
+    'trend.empty': 'There is not enough annual data yet.',
     'annotationSearch.eyebrow': 'IDEA INDEX',
     'annotationSearch.title': 'Search all annotations',
     'annotationSearch.label': 'Search annotations',
@@ -312,6 +328,7 @@ const elements = {
   pickerResult: document.querySelector('#picker-result'),
   reportYear: document.querySelector('#report-year'),
   reportContent: document.querySelector('#report-content'),
+  annualTrend: document.querySelector('#annual-trend'),
   annotationSearch: document.querySelector('#annotation-search'),
   annotationKind: document.querySelector('#annotation-kind'),
   annotationStyle: document.querySelector('#annotation-style'),
@@ -431,14 +448,164 @@ function queryParameters(includePaging = true) {
 
 async function loadSummary() {
   const summary = await requestJSON('/api/summary');
+  const totalTime = document.querySelector('#total-reading-time');
+  totalTime.innerHTML = summary.readingTimeAvailable ? formatCompactReadingTime(summary.readingSeconds) : '—';
+  totalTime.title = summary.readingTimeAvailable
+    ? formatReadingTime(summary.readingSeconds)
+    : (summary.readingTimeError ? t('report.readingUnavailable', { error: summary.readingTimeError }) : t('error.read'));
+  totalTime.setAttribute('aria-label', totalTime.title);
   document.querySelectorAll('[data-stat]').forEach((node) => {
     node.textContent = Number(summary[node.dataset.stat] || 0).toLocaleString(displayLocale());
   });
   state.finishedYears = summary.finishedYears || [];
   state.collectionYears = summary.collectionYears || [];
+  state.annotationYears = summary.annotationYears || [];
   state.readingYears = summary.readingYears || [];
   updateYearOptions();
   updateReportYears();
+}
+
+async function loadAnnualTrend() {
+  const years = new Set();
+  state.finishedYears.forEach(({ year }) => years.add(year));
+  state.collectionYears.forEach(({ year }) => years.add(year));
+  state.annotationYears.forEach((year) => years.add(year));
+  state.readingYears.forEach((year) => years.add(year));
+  const orderedYears = [...years].sort((left, right) => left - right);
+  if (orderedYears.length === 0) {
+    state.annualReports = [];
+    renderAnnualTrend();
+    return;
+  }
+
+  elements.annualTrend.innerHTML = `<p>${t('common.loading')}</p>`;
+  try {
+    state.annualReports = await Promise.all(orderedYears.map((year) => requestJSON(`/api/reports/year?year=${encodeURIComponent(year)}`)));
+    renderAnnualTrend();
+  } catch (error) {
+    elements.annualTrend.innerHTML = `<p>${escapeHTML(error.message)}</p>`;
+  }
+}
+
+// Monotone cubic interpolation rounds corners without inventing peaks between years.
+function annualTrendPath(points) {
+  if (points.length === 0) return '';
+  const slopes = points.slice(1).map((point, index) =>
+    (point.y - points[index].y) / (point.x - points[index].x));
+  const tangents = points.map((_, index) => {
+    if (index === 0) return slopes[0] || 0;
+    if (index === points.length - 1) return slopes[index - 1] || 0;
+    const before = slopes[index - 1];
+    const after = slopes[index];
+    if (before * after <= 0) return 0;
+    return Math.sign(before) * Math.min(Math.abs(before), Math.abs(after));
+  });
+  let path = `M ${points[0].x} ${points[0].y}`;
+  for (let index = 1; index < points.length; index++) {
+    const start = points[index - 1];
+    const end = points[index];
+    const handle = (end.x - start.x) / 3;
+    path += ` C ${start.x + handle} ${start.y + handle * tangents[index - 1]}, ${end.x - handle} ${end.y - handle * tangents[index]}, ${end.x} ${end.y}`;
+  }
+  return path;
+}
+
+function renderAnnualTrend() {
+  const reports = state.annualReports;
+  if (reports.length === 0) {
+    elements.annualTrend.innerHTML = `<p class="trend-empty">${t('trend.empty')}</p>`;
+    return;
+  }
+
+  const width = 1000;
+  const height = 220;
+  const padding = { top: 20, right: 30, bottom: 34, left: 42 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const yearSpan = reports.at(-1).year - reports[0].year;
+  const x = (index) => yearSpan === 0 ? padding.left + plotWidth / 2 : padding.left + plotWidth * (reports[index].year - reports[0].year) / yearSpan;
+  const series = [
+    { field: 'finishedBooks', label: t('trend.finished'), className: 'finished', format: (value) => `${value.toLocaleString(displayLocale())} ${t('unit.books')}` },
+    { field: 'readingSeconds', label: t('trend.readingTime'), className: 'reading', available: (report) => report.readingTimeAvailable, format: formatReadingTime },
+    { field: 'highlightNoteCount', label: t('trend.annotations'), className: 'annotations', format: (value) => `${value.toLocaleString(displayLocale())} ${t('unit.items')}` }
+  ];
+
+  const grid = [0, .5, 1].map((ratio) => {
+    const y = padding.top + plotHeight * (1 - ratio);
+    return `<text class="trend-scale" x="0" y="${y + 4}">${ratio * 100}%</text><line class="trend-grid-line" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}"></line>`;
+  }).join('');
+  const labelStep = Math.max(1, Math.ceil(reports.length / 10));
+  const years = reports.map((report, index) => {
+    if (index % labelStep !== 0 && index !== reports.length - 1) return '';
+    return `<text class="trend-year" x="${x(index)}" y="${height - 13}" text-anchor="middle">${report.year}</text>`;
+  }).join('');
+
+  const lines = series.map((item) => {
+    const availableReports = reports.filter((report) => !item.available || item.available(report));
+    const maximum = Math.max(1, ...availableReports.map((report) => Number(report[item.field] || 0)));
+    const points = reports.map((report, index) => {
+      if (item.available && !item.available(report)) return null;
+      const value = Number(report[item.field] || 0);
+      return { report, value, x: x(index), y: padding.top + plotHeight * (1 - value / maximum) };
+    });
+    const paths = [];
+    let segment = [];
+    points.forEach((point) => {
+      if (point) {
+        segment.push(point);
+      } else if (segment.length > 0) {
+        paths.push(segment);
+        segment = [];
+      }
+    });
+    if (segment.length > 0) paths.push(segment);
+    const curves = paths.map((path) => `<path class="trend-line trend-${item.className}" d="${annualTrendPath(path)}"></path>`).join('');
+    const dots = points.filter(Boolean).map((point) => {
+      const actualValue = item.format(point.value);
+      const accessibleLabel = `${point.report.year} · ${item.label}: ${actualValue}`;
+      return `<circle class="trend-dot trend-${item.className}" cx="${point.x}" cy="${point.y}" r="3.5" aria-label="${escapeHTML(accessibleLabel)}"></circle>`;
+    }).join('');
+    return curves + dots;
+  }).join('');
+
+  const legend = series.map((item) => `<div class="trend-metric trend-${item.className}"><span><i></i>${escapeHTML(item.label)}</span><strong data-trend-value="${item.field}"></strong></div>`).join('');
+  const yearTargets = reports.map((report, index) => {
+    const left = index === 0 ? padding.left : (x(index - 1) + x(index)) / 2;
+    const right = index === reports.length - 1 ? width - padding.right : (x(index) + x(index + 1)) / 2;
+    return `<rect class="trend-year-target" data-trend-index="${index}" x="${left}" y="0" width="${right - left}" height="${height}" tabindex="0" role="button" aria-label="${report.year}"></rect>`;
+  }).join('');
+  elements.annualTrend.innerHTML = `
+    <div class="trend-period"><strong id="trend-selected-year"></strong><span>${reports[0].year} — ${reports.at(-1).year}</span></div>
+    <div class="trend-metrics">${legend}</div>
+    <div class="trend-chart-scroll">
+      <svg class="trend-chart" viewBox="0 0 ${width} ${height}" role="group" aria-label="${escapeHTML(t('trend.title'))}">
+        ${grid}<line id="trend-cursor" class="trend-cursor" y1="8" y2="${height - padding.bottom}"></line>${lines}${years}${yearTargets}
+      </svg>
+    </div>`;
+  const selectYear = (index) => {
+    const report = reports[index];
+    elements.annualTrend.querySelector('#trend-selected-year').textContent = String(report.year);
+    series.forEach((item) => {
+      const value = item.available && !item.available(report) ? '—' : item.format(Number(report[item.field] || 0));
+      elements.annualTrend.querySelector(`[data-trend-value="${item.field}"]`).textContent = value;
+    });
+    const cursor = elements.annualTrend.querySelector('#trend-cursor');
+    cursor.setAttribute('x1', x(index));
+    cursor.setAttribute('x2', x(index));
+    elements.annualTrend.querySelectorAll('[data-trend-index]').forEach((target) => {
+      target.setAttribute('aria-pressed', String(Number(target.dataset.trendIndex) === index));
+    });
+  };
+  elements.annualTrend.querySelectorAll('[data-trend-index]').forEach((target) => {
+    const select = () => selectYear(Number(target.dataset.trendIndex));
+    target.addEventListener('pointerenter', select);
+    target.addEventListener('focus', select);
+    target.addEventListener('click', select);
+    target.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(); }
+    });
+  });
+  selectYear(reports.length - 1);
 }
 
 function updateReportYears() {
@@ -446,6 +613,7 @@ function updateReportYears() {
   const years = new Set([new Date().getFullYear()]);
   state.finishedYears.forEach(({ year }) => years.add(year));
   state.collectionYears.forEach(({ year }) => years.add(year));
+  state.annotationYears.forEach((year) => years.add(year));
   state.readingYears.forEach((year) => years.add(year));
   elements.reportYear.replaceChildren();
   [...years].sort((left, right) => right - left).forEach((year) => {
@@ -552,7 +720,7 @@ function renderYearReport(report) {
   const annotationBars = renderMonthChart(report, 'annotationCount', (value) => value.toLocaleString(displayLocale()), monthFormatter);
   const readingBars = renderMonthChart(report, 'readingSeconds', formatReadingTime, monthFormatter);
   const readingMetrics = report.readingTimeAvailable ? `
-      <div><strong>${escapeHTML(formatReadingTime(report.readingSeconds))}</strong><span>${t('report.readingTime')}</span></div>` : '';
+      <div class="report-duration"><strong title="${escapeHTML(formatReadingTime(report.readingSeconds))}" aria-label="${escapeHTML(formatReadingTime(report.readingSeconds))}">${formatCompactReadingTime(report.readingSeconds)}</strong><span>${t('report.readingTime')}</span></div>` : '';
   const readingSection = report.readingTimeAvailable
     ? `<h3>${t('report.monthlyReading')}</h3><div class="month-chart reading-chart">${readingBars}</div>`
     : (report.readingTimeError ? `<p class="report-warning">${escapeHTML(t('report.readingUnavailable', { error: report.readingTimeError }))}</p>` : '');
@@ -594,6 +762,15 @@ function renderMonthChart(report, field, formatValue, monthFormatter) {
       <small>${escapeHTML(label)}</small>
     </div>`;
   }).join('');
+}
+
+function formatCompactReadingTime(seconds) {
+  const minutes = Number(seconds || 0) / 60;
+  const usesHours = minutes >= 60;
+  const value = new Intl.NumberFormat(displayLocale(), { maximumFractionDigits: usesHours ? 1 : 0 })
+    .format(usesHours ? minutes / 60 : minutes);
+  const unit = state.language === 'en' ? (usesHours ? 'h' : 'm') : (usesHours ? '小时' : '分');
+  return `${escapeHTML(value)}<small>${unit}</small>`;
 }
 
 function formatReadingTime(seconds) {
@@ -838,10 +1015,11 @@ function changeLanguage(language) {
   saveLanguage(language);
   applyStaticTranslations();
   updateYearOptions();
+  renderAnnualTrend();
   if (elements.dialog.open && state.bookDetail) {
     renderBookDetail(state.bookDetail.book, state.bookDetail.annotations);
   }
-  Promise.all([loadSummary().then(loadYearReport), loadReview(), loadBooks(), loadAnnotations(), loadWantToRead()]).catch((error) => showToast(error.message));
+  Promise.all([loadSummary().then(() => Promise.all([loadYearReport(), loadAnnualTrend()])), loadReview(), loadBooks(), loadAnnotations(), loadWantToRead()]).catch((error) => showToast(error.message));
 }
 
 function closeBookDialog() {
@@ -925,4 +1103,4 @@ function scrollToWantToRead() { document.querySelector('.want-to-read-section').
 
 initializePageSizes();
 applyStaticTranslations();
-Promise.all([loadSummary().then(loadYearReport), loadReview(), loadBooks(), loadAnnotations(), loadWantToRead()]).catch((error) => showToast(error.message));
+Promise.all([loadSummary().then(() => Promise.all([loadYearReport(), loadAnnualTrend()])), loadReview(), loadBooks(), loadAnnotations(), loadWantToRead()]).catch((error) => showToast(error.message));

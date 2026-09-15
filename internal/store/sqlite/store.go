@@ -143,16 +143,57 @@ func (s *Store) Summary(ctx context.Context) (domain.Summary, error) {
 		return domain.Summary{}, err
 	}
 	summary.CollectionYears = collectionYears
+	annotationYears, err := s.annotationYears(ctx)
+	if err != nil {
+		return domain.Summary{}, err
+	}
+	summary.AnnotationYears = annotationYears
+	log.Debug("Apple Books annotation years loaded", "years", summary.AnnotationYears)
 	if s.history != nil {
-		summary.ReadingYears, err = s.history.Years(ctx)
+		summary.ReadingYears, summary.ReadingSeconds, err = s.history.Totals(ctx)
 		if err != nil {
 			summary.ReadingTimeError = err.Error()
 			log.Error("read Apple Books reading history years failed", "error", err)
 		} else {
-			log.Debug("Apple Books reading history years loaded", "years", summary.ReadingYears)
+			summary.ReadingTimeAvailable = true
+			log.Debug("Apple Books reading history totals loaded", "years", summary.ReadingYears, "seconds", summary.ReadingSeconds)
 		}
 	}
 	return summary, nil
+}
+
+func (s *Store) annotationYears(ctx context.Context) ([]int, error) {
+	rows, err := s.annotation.QueryContext(ctx, `
+		SELECT ZANNOTATIONCREATIONDATE
+		FROM ZAEANNOTATION
+		WHERE COALESCE(ZANNOTATIONDELETED, 0) = 0
+		  AND ZANNOTATIONTYPE IN (1, 2)
+		  AND ZANNOTATIONCREATIONDATE IS NOT NULL`)
+	if err != nil {
+		return nil, fmt.Errorf("query annotation years: %w", err)
+	}
+	defer rows.Close()
+
+	yearSet := make(map[int]struct{})
+	for rows.Next() {
+		var rawDate sql.NullFloat64
+		if err := rows.Scan(&rawDate); err != nil {
+			return nil, fmt.Errorf("scan annotation year: %w", err)
+		}
+		if createdAt := appleTime(rawDate); createdAt != nil {
+			yearSet[createdAt.Year()] = struct{}{}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate annotation years: %w", err)
+	}
+
+	years := make([]int, 0, len(yearSet))
+	for year := range yearSet {
+		years = append(years, year)
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(years)))
+	return years, nil
 }
 
 func (s *Store) finishedYears(ctx context.Context) ([]domain.FinishedYear, error) {
@@ -803,7 +844,8 @@ func (s *Store) YearReport(ctx context.Context, year int) (domain.YearReport, er
 	}
 
 	rows, err := s.annotation.QueryContext(ctx, `
-		SELECT ZANNOTATIONCREATIONDATE, COALESCE(ZANNOTATIONNOTE, ''), COALESCE(ZANNOTATIONASSETID, '')
+		SELECT ZANNOTATIONCREATIONDATE, COALESCE(ZANNOTATIONSELECTEDTEXT, ''),
+		       COALESCE(ZANNOTATIONNOTE, ''), COALESCE(ZANNOTATIONASSETID, '')
 		FROM ZAEANNOTATION
 		WHERE COALESCE(ZANNOTATIONDELETED, 0) = 0
 		  AND ZANNOTATIONTYPE IN (1, 2)
@@ -816,8 +858,8 @@ func (s *Store) YearReport(ctx context.Context, year int) (domain.YearReport, er
 	bookCounts := make(map[string]int64)
 	for rows.Next() {
 		var rawDate sql.NullFloat64
-		var note, assetID string
-		if err := rows.Scan(&rawDate, &note, &assetID); err != nil {
+		var selectedText, note, assetID string
+		if err := rows.Scan(&rawDate, &selectedText, &note, &assetID); err != nil {
 			return domain.YearReport{}, fmt.Errorf("scan year report annotation: %w", err)
 		}
 		createdAt := appleTime(rawDate)
@@ -825,8 +867,12 @@ func (s *Store) YearReport(ctx context.Context, year int) (domain.YearReport, er
 			continue
 		}
 		report.AnnotationCount++
+		if strings.TrimSpace(selectedText) != "" {
+			report.HighlightNoteCount++
+		}
 		if strings.TrimSpace(note) != "" {
 			report.NoteCount++
+			report.HighlightNoteCount++
 		}
 		report.Months[int(createdAt.Month())-1].AnnotationCount++
 		activeDates[createdAt.Format("2006-01-02")] = struct{}{}

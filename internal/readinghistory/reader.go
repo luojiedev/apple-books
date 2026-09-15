@@ -72,6 +72,28 @@ func (r *Reader) Years(ctx context.Context) ([]int, error) {
 	if err != nil {
 		return nil, err
 	}
+	return model.years(), nil
+}
+
+// Totals reads one history snapshot so the year list and duration stay consistent.
+func (r *Reader) Totals(ctx context.Context) ([]int, int64, error) {
+	model, err := r.model(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	years := model.years()
+	var seconds int64
+	for _, year := range years {
+		activity, err := model.year(year)
+		if err != nil {
+			return nil, 0, err
+		}
+		seconds += activity.Seconds
+	}
+	return years, seconds, nil
+}
+
+func (model decodedModel) years() []int {
 	years := make(map[int]struct{})
 	for key := range model.months {
 		years[key/100] = struct{}{}
@@ -81,7 +103,7 @@ func (r *Reader) Years(ctx context.Context) ([]int, error) {
 		result = append(result, year)
 	}
 	sort.Sort(sort.Reverse(sort.IntSlice(result)))
-	return result, nil
+	return result
 }
 
 func (r *Reader) model(ctx context.Context) (decodedModel, error) {

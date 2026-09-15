@@ -58,6 +58,15 @@
         </button>
         <div class="stat-card"><span data-i18n="annotation.highlight">高亮</span><strong data-stat="highlightCount">—</strong><small data-i18n="unit.items">条</small></div>
         <div class="stat-card"><span data-i18n="annotation.note">笔记</span><strong data-stat="noteCount">—</strong><small data-i18n="unit.items">条</small></div>
+        <div class="stat-card total-duration"><span data-i18n="trend.readingTime">阅读总时长</span><strong id="total-reading-time">—</strong></div>
+      </section>
+
+      <section class="trend-panel" aria-labelledby="trend-title">
+        <div class="trend-heading">
+          <div><p class="eyebrow" data-i18n="trend.eyebrow">长期轨迹</p><h2 id="trend-title" data-i18n="trend.title">年度阅读趋势</h2></div>
+          <p data-i18n="trend.scaleNote">各指标按自身峰值缩放，悬停或聚焦数据点可查看实际值。</p>
+        </div>
+        <div id="annual-trend" class="annual-trend" aria-live="polite"><p data-i18n="common.loading">正在载入…</p></div>
       </section>
 
       <section class="discovery-grid" aria-label="阅读探索" data-i18n-aria-label="discovery.label">

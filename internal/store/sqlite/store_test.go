@@ -55,6 +55,10 @@ func TestStoreReadsBooksAndUserAnnotations(t *testing.T) {
 	if len(summary.CollectionYears) != 2 {
 		t.Fatalf("unexpected collection years: %+v", summary.CollectionYears)
 	}
+	wantAnnotationYear := appleTime(sql.NullFloat64{Float64: 800000000, Valid: true}).Year()
+	if len(summary.AnnotationYears) != 1 || summary.AnnotationYears[0] != wantAnnotationYear {
+		t.Fatalf("unexpected annotation years: %+v", summary.AnnotationYears)
+	}
 	var collectedBooks, recordedBooks, purchasedBooks, createdBooks int64
 	for _, year := range summary.CollectionYears {
 		collectedBooks += year.Count
@@ -163,6 +167,9 @@ func TestStoreReadsBooksAndUserAnnotations(t *testing.T) {
 	}
 	if report.AnnotationCount != 1 || report.NoteCount != 1 || report.ActiveDays != 1 {
 		t.Fatalf("unexpected year report totals: %+v", report)
+	}
+	if report.HighlightNoteCount != 2 {
+		t.Fatalf("year report highlight/note total = %d, want 2", report.HighlightNoteCount)
 	}
 	if len(report.TopBooks) != 1 || report.TopBooks[0].Book.Title != "测试书" {
 		t.Fatalf("unexpected year report ranking: %+v", report.TopBooks)
