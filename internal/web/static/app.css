@@ -275,6 +275,8 @@ h1 { margin: 0; font-size: clamp(24px, 2.6vw, 32px); font-weight: 700; line-heig
   color: var(--ink); background: var(--card); text-decoration: none; box-shadow: var(--shadow-sm); font-size: 12px; font-weight: 600;
 }
 .detail-export:hover { border-color: #b8b8bf; background: #fafafa; }
+.detail-export-option { display: flex; align-items: center; gap: 7px; margin-top: 12px; color: var(--muted); font-size: 12px; cursor: pointer; }
+.detail-export-option input { margin: 0; accent-color: var(--ink); }
 .detail-facts { padding: 24px 52px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; border-bottom: 1px solid var(--line); }
 .detail-facts span { display: block; color: var(--muted); font-size: 11px; margin-bottom: 5px; }
 .detail-description { padding: 24px 52px 0; color: var(--muted); line-height: 1.75; font-size: 13px; }

@@ -8,7 +8,7 @@ The project focuses first on its most important job: giving you a complete, port
 
 ## Key Features
 
-- **Export highlights and notes from each book to Markdown**: includes the title, author, annotation type, and timestamps; when the original EPUB is available locally, entries are grouped by chapter and arranged in reading order
+- **Export highlights and notes from each book to Markdown**: includes the title and author, with annotation types and timestamps hidden by default; uncheck “Hide annotation types and timestamps” to include them. When the original EPUB is available locally, entries are grouped by chapter and arranged in reading order
 - Export the currently filtered library as a UTF-8 CSV file
 - View the reading progress, highlights, notes, and bookmarks for an individual book
 - Search the entire library by title, author, or category
@@ -145,6 +145,8 @@ Highlight and note text can still be exported from the SQLite databases, but cha
 2. Select its card to open the detail view.
 3. Select “Export highlights and notes”.
 4. The browser downloads a Markdown file named after the book.
+
+“Hide quote bars and separator lines” is also checked by default. Excerpts use plain paragraphs separated by blank lines. Uncheck it to restore block quotes and horizontal rules, independently of the types and timestamps option.
 
 If the original EPUB is locally accessible and not restricted by DRM, the export uses its table of contents for chapter headings. When a chapter spans multiple HTML files, the application groups them under the correct chapter as well.
 

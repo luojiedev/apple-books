@@ -47,7 +47,12 @@ func (s *Server) exportBookAnnotations(response http.ResponseWriter, request *ht
 			chapters = resolver
 		}
 	}
-	content := renderBookAnnotationsMarkdown(book, annotations, chapters)
+	options := annotationExportOptions{
+		ShowMetadata: request.URL.Query().Get("showMetadata") == "true",
+		ShowLines:    request.URL.Query().Get("showLines") == "true",
+	}
+	log.Debug("export book annotations", "book_id", book.ID, "show_metadata", options.ShowMetadata, "show_lines", options.ShowLines, "annotation_count", len(annotations))
+	content := renderBookAnnotationsMarkdown(book, annotations, chapters, options)
 	filename := url.PathEscape(exportFilename(book.Title, book.ID))
 	response.Header().Set("Content-Type", "text/markdown; charset=utf-8")
 	response.Header().Set("Content-Disposition", "attachment; filename*=UTF-8''"+filename)
@@ -66,7 +71,12 @@ type chapterResolver interface {
 	Lookup(location string) (epub.Chapter, bool)
 }
 
-func renderBookAnnotationsMarkdown(book domain.Book, annotations []domain.Annotation, chapters chapterResolver) string {
+type annotationExportOptions struct {
+	ShowMetadata bool
+	ShowLines    bool
+}
+
+func renderBookAnnotationsMarkdown(book domain.Book, annotations []domain.Annotation, chapters chapterResolver, options annotationExportOptions) string {
 	items := make([]exportAnnotation, 0, len(annotations))
 	for _, annotation := range annotations {
 		if strings.TrimSpace(annotation.SelectedText) == "" && strings.TrimSpace(annotation.Note) == "" {
@@ -111,13 +121,19 @@ func renderBookAnnotationsMarkdown(book domain.Book, annotations []domain.Annota
 		}
 
 		annotation := item.annotation
-		fmt.Fprintf(&output, "### %s", annotationExportType(annotation))
-		if annotation.CreatedAt != nil {
-			fmt.Fprintf(&output, " · %s", annotation.CreatedAt.Format("2006-01-02 15:04"))
+		if options.ShowMetadata {
+			fmt.Fprintf(&output, "### %s", annotationExportType(annotation))
+			if annotation.CreatedAt != nil {
+				fmt.Fprintf(&output, " · %s", annotation.CreatedAt.Format("2006-01-02 15:04"))
+			}
+			output.WriteString("\n\n")
 		}
-		output.WriteString("\n\n")
 		if strings.TrimSpace(annotation.SelectedText) != "" {
-			output.WriteString(markdownQuote(annotation.SelectedText))
+			if options.ShowLines {
+				output.WriteString(markdownQuote(annotation.SelectedText))
+			} else {
+				output.WriteString(markdownText(strings.TrimSpace(annotation.SelectedText)))
+			}
 			output.WriteString("\n\n")
 		}
 		if strings.TrimSpace(annotation.Note) != "" {
@@ -126,7 +142,9 @@ func renderBookAnnotationsMarkdown(book domain.Book, annotations []domain.Annota
 		if !item.resolved && annotation.Location != "" {
 			fmt.Fprintf(&output, "`位置：%s`\n\n", strings.ReplaceAll(annotation.Location, "`", ""))
 		}
-		output.WriteString("---\n")
+		if options.ShowLines {
+			output.WriteString("---\n\n")
+		}
 	}
 	return output.String()
 }

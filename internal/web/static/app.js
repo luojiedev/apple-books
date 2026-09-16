@@ -16,6 +16,8 @@ const state = {
   readingYears: [],
   annualReports: [],
   bookDetail: null,
+  hideExportMetadata: true,
+  hideExportLines: true,
   language: initialLanguage()
 };
 
@@ -149,6 +151,8 @@ const translations = {
     'detail.loading': '正在翻开这本书…',
     'detail.progress': '阅读进度',
     'detail.export': '导出本书高亮与笔记',
+    'detail.hideExportMetadata': '隐藏笔记类型和时间',
+    'detail.hideExportLines': '隐藏引用竖线和分隔横线',
     'detail.collectedAt': '收集时间',
     'detail.lastOpenedAt': '最后打开',
     'detail.finishedAt': '完成时间',
@@ -291,6 +295,8 @@ const translations = {
     'detail.loading': 'Opening this book…',
     'detail.progress': 'Reading progress',
     'detail.export': 'Export highlights and notes',
+    'detail.hideExportMetadata': 'Hide annotation types and timestamps',
+    'detail.hideExportLines': 'Hide quote bars and separator lines',
     'detail.collectedAt': 'Collected',
     'detail.lastOpenedAt': 'Last opened',
     'detail.finishedAt': 'Finished',
@@ -941,6 +947,14 @@ async function openBook(id) {
   }
 }
 
+function annotationExportURL(bookID) {
+  const parameters = new URLSearchParams({
+    showMetadata: String(!state.hideExportMetadata),
+    showLines: String(!state.hideExportLines)
+  });
+  return `/api/books/${bookID}/annotations.md?${parameters}`;
+}
+
 function renderBookDetail(book, annotations) {
   const percent = Math.max(0, Math.min(100, book.progress * 100));
   const annotationHTML = annotations.length
@@ -962,7 +976,9 @@ function renderBookDetail(book, annotations) {
       <div class="detail-progress"><span>${t('detail.progress')}</span><strong>${percent.toFixed(1)}%</strong>
         <progress class="progress-track" max="100" value="${percent}" aria-label="${t('book.progressLabel', { percent: percent.toFixed(1) })}"></progress>
       </div>
-      <a class="detail-export" href="/api/books/${book.id}/annotations.md" download>${t('detail.export')}</a>
+      <a class="detail-export" href="${annotationExportURL(book.id)}" download>${t('detail.export')}</a>
+      <label class="detail-export-option"><input type="checkbox" id="hide-export-metadata" ${state.hideExportMetadata ? 'checked' : ''}>${t('detail.hideExportMetadata')}</label>
+      <label class="detail-export-option"><input type="checkbox" id="hide-export-lines" ${state.hideExportLines ? 'checked' : ''}>${t('detail.hideExportLines')}</label>
     </header>
     <div class="detail-facts">
       <div><span>${t('detail.collectedAt')}</span>${formatDate(book.collectedAt)}${book.collectionSource ? ` · ${collectionSourceText(book.collectionSource)}` : ''}</div>
@@ -972,6 +988,14 @@ function renderBookDetail(book, annotations) {
     </div>
     ${book.description ? `<p class="detail-description">${escapeHTML(book.description)}</p>` : ''}
     <section class="annotations"><h3>${t('detail.annotationsAndNotes')}</h3>${annotationHTML}</section>`;
+  elements.dialogContent.querySelector('#hide-export-metadata').addEventListener('change', (event) => {
+    state.hideExportMetadata = event.target.checked;
+    elements.dialogContent.querySelector('.detail-export').href = annotationExportURL(book.id);
+  });
+  elements.dialogContent.querySelector('#hide-export-lines').addEventListener('change', (event) => {
+    state.hideExportLines = event.target.checked;
+    elements.dialogContent.querySelector('.detail-export').href = annotationExportURL(book.id);
+  });
 }
 
 function statusText(status) {
