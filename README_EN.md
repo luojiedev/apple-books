@@ -1,211 +1,87 @@
 # Apple Books Reading Archive
 
-[简体中文](README.md) · **English**
+**Export your Apple Books highlights and notes to Markdown, and rediscover your year in reading.**
 
-A local reading archive and export tool for Apple Books. It never modifies the Apple Books databases or uploads your books, highlights, notes, or reading history.
+Organize excerpts by chapter, search notes across your library, and revisit past reads. Everything stays on your machine; Apple Books databases are always opened read-only.
 
-The project focuses first on its most important job: giving you a complete, portable copy of your reading data from Apple Books.
+[简体中文](README.md) · **English** · [Quick start](#quick-start) · [Screenshots](#screenshots) · [User guide](docs/guide.en.md)
 
-## Key Features
+![Apple Books Reading Archive: a random highlight, reading statistics, and annual trends](docs/screenshots/overview-en.png)
 
-- **Export highlights and notes from each book to Markdown**: includes the title and author, with annotation types and timestamps hidden by default; uncheck “Hide annotation types and timestamps” to include them. When the original EPUB is available locally, entries are grouped by chapter and arranged in reading order
-- Export the currently filtered library as a UTF-8 CSV file
-- View the reading progress, highlights, notes, and bookmarks for an individual book
-- Search the entire library by title, author, or category
-- Filter books by not started, reading, or finished
-- Browse the library by collection year and finished books by completion year
-- Sort by recently opened, reading progress, title, or author
-- Rediscover a random historical highlight, with an option to show only excerpts that include a personal note
-- Search highlight text and notes across the library, with annotation-type and highlight-color filters
-- Browse the Apple Books Want to Read collection below annotation search
-- Set independent page sizes for annotations, Want to Read, and the library, with choices remembered in the browser
-- Generate annual reports covering historical reading time, collected and finished books, annotation days, and monthly activity
-- Compare books finished, total reading time, and highlights/notes by year in one annual trend chart
-- Pick the next book from unread, stalled, or all books with the book picker
-- Restore Apple Books highlight colors in annotation lists and book details
-- Switch the interface between Chinese and English, with the preference remembered in the browser
-- Process everything locally without loading third-party resources in the page
+*The real application, populated with fictional books, excerpts, notes, and statistics. All screenshots below use the same demo data.*
 
-Apple Books stores daily cumulative reading time in `ReadingHistoryModel`, which this tool uses for annual and monthly totals. It does not contain complete individual sessions or reliable per-book duration, and Apple may compact older daily details, so the tool does not estimate those values or historical reading-day counts.
+## What you can do
 
-## Requirements
+| | What it does for you |
+| --- | --- |
+| **Take your notes with you** | Export each book's highlights and personal notes to Markdown, including the title and author. Group entries by chapter when the original local EPUB is available and readable. |
+| **Find what you read** | Search highlights and notes across your library, filter by annotation type or color, and rediscover a random excerpt. |
+| **Revisit your reading history** | See annual reading time, books finished, and monthly annotation activity. Compare your reading across years. |
+| **Keep your data local** | Read-only database access, a default address of `127.0.0.1`, no data uploads, and no third-party resources loaded by the page. |
 
-- Go 1.25 or later
-- macOS is recommended so the tool can read the latest Apple Books data and local EPUB files directly
-- Windows and Linux are supported after the SQLite databases have been copied manually from a Mac
+Also includes library search and filters, Want to Read, a random book picker, library CSV export, and Chinese / English interface switching.
 
-## macOS: Read the Latest Data Automatically
+## Quick start
 
-Run the application directly on macOS:
+**macOS** is recommended. Install **Git** and **Go 1.25 or later**, and make sure the books and annotations you want have synced locally in Apple Books.
 
 ```bash
+git clone https://github.com/luojiedev/apple-books.git
+cd apple-books
 go run ./cmd/apple-books
 ```
 
-The application automatically finds the newest `.sqlite` files in:
+Open **<http://127.0.0.1:8787>**. The application automatically discovers your local Apple Books library, annotation, and reading-history databases and opens them read-only.
 
-```text
-~/Library/Containers/com.apple.iBooksX/Data/Documents/BKLibrary/
-~/Library/Containers/com.apple.iBooksX/Data/Documents/AEAnnotation/
-~/Library/Group Containers/group.com.apple.iBooks/Documents/BCCloudData-BookDataStoreService/CRDTModelSync-ReadingHistoryModel/
-```
+Try it: find a book with highlights → open its details → click **“Export highlights and notes”** → save the Markdown file.
 
-Reading history uses Apple's CRDT format in the SQLite `ZCRDTMODELSYNCENTITY.ZPROTODATA` column. The currently verified macOS CRDT v4 format is supported. An unknown version is reported explicitly on the annual report while the library and annotation features remain usable.
+- Permission error? See [macOS permissions](docs/guide.en.md#macos-permissions).
+- On Windows / Linux, or using database snapshots? See the [user guide](docs/guide.en.md).
 
-Then open:
+## Screenshots
 
-<http://127.0.0.1:8787>
+### Turn highlights and thoughts into portable notes
 
-Automatic discovery is recommended because recent Apple Books changes may still be stored in SQLite WAL files. The databases are opened in read-only mode, so the application can read those records without writing data or running migrations.
+View original highlight colors and personal notes, then export to Markdown. Choose whether to include annotation types, timestamps, and quote markers before exporting.
 
-### iCloud Books and Annotation Sync
+![Book details: highlights, personal notes, and Markdown export options](docs/screenshots/book-notes-en.png)
 
-Apple Books may sync book metadata, ebook files, and annotations separately. A book appearing in your library or Reading Now list does not necessarily mean its highlights and notes have already been written to the local `AEAnnotation` database. For a book that exists only in iCloud and has not been downloaded, this tool may report that no local highlights or notes were found, and its exported Markdown may contain no annotation body.
+Read the exported file directly or bring it into a Markdown-compatible notes app. Browse an [actual sample export](docs/examples/reading-notes.md), with chapter headings resolved from a demo EPUB. The sample text is Chinese; exported metadata labels currently remain Chinese even with the English interface selected.
 
-If this happens:
+### See your year in reading
 
-1. Find the book in Apple Books and download it to the Mac.
-2. Open the book once and wait for its highlights and notes to finish syncing.
-3. Return to this tool, refresh the page, or reopen the book details.
-4. If the annotations still do not appear, restart the tool so it establishes a new database connection.
+Explore monthly reading time, annotation counts, and the books you annotated most. Annotation days count dates when annotations were created, not total days spent reading.
 
-This tool does not call private Apple APIs to force an iCloud download. Apple Books must perform the initial download and annotation sync. Access to the original EPUB mainly determines whether chapter titles can be resolved; exporting the highlight and note text depends on whether the corresponding records have reached the local `AEAnnotation` database.
+![Annual report: reading time, monthly annotations, and most annotated books](docs/screenshots/annual-report-en.png)
 
-The application does not load a permanent in-memory snapshot at startup. Every page request runs fresh read-only SQL queries. If Apple Books commits new annotations to the same SQLite database, refreshing the page or reopening the details will usually reveal them. The tool does not currently poll for changes or watch database files, however. If Apple Books replaces the database or WAL file during sync, an existing connection may continue to reference the old file, and the tool must be restarted.
+### Find that passage again
 
-### macOS Permissions
+Search highlight text and notes across your library, narrow results by annotation type and color, and click a book title to open its details.
 
-macOS may request permission the first time the Apple Books container is accessed. Grant access to the application that launches the tool, such as Terminal, iTerm, your IDE, or Codex.
+![Library-wide annotation search with keyword, type, and highlight-color filters](docs/screenshots/annotation-search-en.png)
 
-If no prompt appears but the logs contain `operation not permitted` or `permission denied`:
+## Frequently asked questions
 
-1. Open System Settings.
-2. Go to Privacy & Security → Full Disk Access.
-3. Enable access for the Terminal, IDE, or Codex instance that launches the tool.
-4. Quit that application completely, reopen it, and run the tool again.
+**Does this modify Apple Books or upload my notes?**
 
-The tool only needs read access and never needs permission to modify Apple Books data.
+No. Databases are opened read-only, the server accepts only loopback listening addresses, and the page loads no remote covers, fonts, or analytics scripts. See [privacy and security](docs/guide.en.md#privacy-and-security).
 
-## Copy the Databases Manually
+**Why is a book visible, but its notes are missing?**
 
-If direct access is unavailable or you prefer not to grant it, you can work from database snapshots. Quit Apple Books completely before copying the main databases and their matching `-wal` and `-shm` files:
+Book metadata and annotations may sync separately. Download and open the book in Apple Books, wait for annotations to sync, then refresh the page. Restart the tool if needed. See [iCloud sync](docs/guide.en.md#icloud-books-and-annotation-sync).
 
-```bash
-mkdir -p BKLibrary AEAnnotation ReadingHistory
+**Can every book be exported with chapter headings?**
 
-cp ~/Library/Containers/com.apple.iBooksX/Data/Documents/BKLibrary/*.sqlite* \
-  ./BKLibrary/
+Chapter lookup requires an accessible original EPUB without DRM restrictions and with a readable structure. If lookup fails, locally available annotation text can still be exported with its original location. See [chapter detection limitations](docs/guide.en.md#chapter-detection-limitations).
 
-cp ~/Library/Containers/com.apple.iBooksX/Data/Documents/AEAnnotation/*.sqlite* \
-  ./AEAnnotation/
+**Can I see reading time for each book?**
 
-cp ~/Library/Group\ Containers/group.com.apple.iBooks/Documents/BCCloudData-BookDataStoreService/CRDTModelSync-ReadingHistoryModel/CRDTModelSync-ReadingHistoryModel* \
-  ./ReadingHistory/
-```
+The tool shows annual and monthly cumulative reading time. It does not estimate per-book duration or historical reading-day counts. Apple may compact older daily records; the currently verified reading-history format is CRDT v4. Apple Books uses private database schemas, so future system updates may affect data access.
 
-On macOS, automatic discovery prefers the latest system databases when they remain accessible. To explicitly use the snapshots you copied, provide both database flags:
+## Documentation and feedback
 
-```bash
-go run ./cmd/apple-books \
-  -library-db "./BKLibrary/BKLibrary-1-091020131601.sqlite" \
-  -annotation-db "./AEAnnotation/AEAnnotation_v10312011_1727_local.sqlite" \
-  -reading-history-db "./ReadingHistory/CRDTModelSync-ReadingHistoryModel"
-```
+- [Complete user guide](docs/guide.en.md): permissions, database snapshots, other platforms, export options, data notes, tests, and logs.
+- [Data discovery notes](docs/data-discovery.md) (Chinese): investigation of local Apple Books data.
+- [Report a bug or suggest an improvement](https://github.com/luojiedev/apple-books/issues): include your OS version, reproduction steps, and sanitized error logs.
 
-File names may vary between Apple Books versions, so use the files you actually copied. The library and annotation flags must be provided together; the reading-history flag is optional.
-
-You can also change the local listening port. To keep reading data off the local network, only loopback addresses are accepted:
-
-```bash
-go run ./cmd/apple-books \
-  -library-db "/path/to/BKLibrary.sqlite" \
-  -annotation-db "/path/to/AEAnnotation.sqlite" \
-  -addr "127.0.0.1:9000"
-```
-
-## Windows and Linux
-
-Windows and Linux cannot access the macOS Apple Books container directly. First quit Apple Books on a Mac, copy the databases as described above, and transfer the `BKLibrary` and `AEAnnotation` directories to the computer that will run this application.
-
-From the project root, run:
-
-```bash
-go run ./cmd/apple-books \
-  -library-db "/path/to/BKLibrary.sqlite" \
-  -annotation-db "/path/to/AEAnnotation.sqlite"
-```
-
-Highlight and note text can still be exported from the SQLite databases, but chapter detection is usually limited. Stored book paths point to iCloud or Apple Books locations on the source Mac, so Windows and Linux cannot access those EPUB files. Markdown export will still include the annotations, label unresolved entries as `Unresolved chapter`, and preserve their original EPUB locations.
-
-## Usage
-
-### Export Highlights and Notes from a Book
-
-1. Search for or locate the book in the library.
-2. Select its card to open the detail view.
-3. Select “Export highlights and notes”.
-4. The browser downloads a Markdown file named after the book.
-
-“Hide quote bars and separator lines” is also checked by default. Excerpts use plain paragraphs separated by blank lines. Uncheck it to restore block quotes and horizontal rules, independently of the types and timestamps option.
-
-If the original EPUB is locally accessible and not restricted by DRM, the export uses its table of contents for chapter headings. When a chapter spans multiple HTML files, the application groups them under the correct chapter as well.
-
-### Export the Library List
-
-Set the search, reading status, year, and sort options, then select “Export current list” in the upper-right corner. The CSV contains only the currently filtered results.
-
-### Random Review
-
-The home page selects an entry from your historical highlights. Enable “Notes only” to review only excerpts that have a personal note attached. Select the book title to open its detail view.
-
-### Search All Annotations
-
-Use the annotation search area to find text in highlights and notes across the entire library. Results can be narrowed by annotation type and Apple Books highlight color. Select a book title in the results to open its full details.
-
-### Annual Reports and Book Picker
-
-Annual reports show monthly activity and annotation-active days based on annotation creation dates; an active day means an annotation was created and does not represent a complete reading day. The book picker can choose from unread books, in-progress books not opened for more than 90 days, or the whole library.
-
-## Data Notes
-
-- `BKLibrary` stores library metadata, reading progress, and related dates.
-- `AEAnnotation` stores highlights, notes, bookmarks, and EPUB CFI locations.
-- `ZANNOTATIONTYPE=3` represents a system-maintained reading position rather than a user annotation, so the application excludes it.
-- Collection time uses the earliest valid value among the purchase date, the library record date (`ZUPDATEDATE`), and the database object creation date to reduce distortions caused by database migration.
-- Apple Books uses a private database schema that Apple may change in a future macOS release.
-
-## Chapter Detection Limitations
-
-The annotation database does not store human-readable chapter titles. It stores EPUB CFI locations, which the application maps to chapters by reading the original EPUB package, spine, and table-of-contents files.
-
-Chapter detection may fail when:
-
-- The original EPUB has been deleted or has not been downloaded from iCloud
-- The Apple Books databases came from another Mac
-- The tool runs on Windows or Linux and cannot access the Mac paths recorded in the database
-- The book is DRM-protected or its EPUB structure is incomplete
-- The content is a PDF or another format that does not use EPUB CFI locations
-
-A chapter detection failure does not prevent highlight and note text from being exported.
-
-Keep in mind that access to the original EPUB only affects chapter detection. Highlight and note text comes from the `AEAnnotation` database. If Apple Books has not synced cloud annotations to the local database, that text cannot be exported either. Download and open the corresponding book in Apple Books first.
-
-## Privacy and Security
-
-- SQLite databases are always opened in read-only mode.
-- The web server listens on `127.0.0.1` by default and is not exposed to the local network.
-- The page does not upload books, annotations, or reading history.
-- The page does not load remote covers, fonts, or analytics scripts.
-- SQLite databases, WAL files, and runtime logs are excluded by `.gitignore`.
-
-## Tests
-
-```bash
-go test ./...
-```
-
-Tests use the system Go build cache and do not create a `.cache` directory inside the project.
-
-## Logs
-
-Following the `slogx` convention, logs are written to `logs/` under the directory where the program runs. Check these logs first when investigating database permissions, schema compatibility, or EPUB chapter parsing errors.
+Issues and pull requests are welcome. If this helps you rediscover your reading notes, consider giving it a Star so more Apple Books readers can find it.
