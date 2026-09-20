@@ -43,16 +43,20 @@ func Open(path string) (*Reader, error) {
 	dsn := (&url.URL{Scheme: "file", Path: absolutePath, RawQuery: "mode=ro"}).String()
 	database, err := sql.Open("sqlite", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("open reading history database: %w", err)
+		return nil, fmt.Errorf("open reading history database %q: %w", absolutePath, err)
 	}
 	if err := database.Ping(); err != nil {
 		_ = database.Close()
-		return nil, fmt.Errorf("read reading history database: %w", err)
+		return nil, fmt.Errorf("read reading history database %q: %w", absolutePath, err)
 	}
 	var count int
-	if err := database.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ZCRDTMODELSYNCENTITY'`).Scan(&count); err != nil || count != 1 {
+	if err := database.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ZCRDTMODELSYNCENTITY'`).Scan(&count); err != nil {
 		_ = database.Close()
-		return nil, errors.New("reading history database has an unsupported schema")
+		return nil, fmt.Errorf("validate reading history database %q: %w", absolutePath, err)
+	}
+	if count != 1 {
+		_ = database.Close()
+		return nil, fmt.Errorf("reading history database %q has an unsupported schema", absolutePath)
 	}
 	return &Reader{database: database}, nil
 }

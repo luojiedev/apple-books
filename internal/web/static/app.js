@@ -2,6 +2,7 @@ const state = {
   limit: savedPageSize('library', 12, [4, 8, 12, 24, 48]),
   offset: 0,
   total: 0,
+  bookRequestID: 0,
   searchTimer: null,
   annotationLimit: savedPageSize('annotations', 6, [3, 6, 12, 24]),
   annotationOffset: 0,
@@ -15,7 +16,9 @@ const state = {
   annotationYears: [],
   readingYears: [],
   annualReports: [],
+  trendYear: null,
   bookDetail: null,
+  detailAnnotationOrder: 'asc',
   hideExportMetadata: true,
   hideExportLines: true,
   language: initialLanguage()
@@ -110,6 +113,7 @@ const translations = {
     'annotation.mark': '标记',
     'library.eyebrow': '书库',
     'library.title': '我的书库',
+    'library.viewBooks': '查看书籍 →',
     'library.pageSizeLabel': '书库每页数量',
     'common.loading': '正在载入…',
     'common.close': '关闭',
@@ -158,6 +162,9 @@ const translations = {
     'detail.finishedAt': '完成时间',
     'detail.annotations': '批注',
     'detail.annotationsAndNotes': '批注与笔记',
+    'detail.annotationOrder': '显示顺序',
+    'detail.annotationOrderAsc': '正序（最早在前）',
+    'detail.annotationOrderDesc': '倒序（最新在前）',
     'detail.notePrefix': '笔记：',
     'detail.emptyTitle': '本机暂未发现这本书的高亮或笔记',
     'detail.emptyCopy': '书籍显示在书库中，并不代表其批注已经从 iCloud 同步到本机。如果这本书尚未下载，请先在 Apple Books 中下载并打开一次，等待同步完成后，再返回此处刷新页面。若仍未显示，请重启本工具后重试。',
@@ -254,6 +261,7 @@ const translations = {
     'annotation.mark': 'Mark',
     'library.eyebrow': 'LIBRARY',
     'library.title': 'My Library',
+    'library.viewBooks': 'View books →',
     'library.pageSizeLabel': 'Library books per page',
     'common.loading': 'Loading…',
     'common.close': 'Close',
@@ -302,6 +310,9 @@ const translations = {
     'detail.finishedAt': 'Finished',
     'detail.annotations': 'Annotations',
     'detail.annotationsAndNotes': 'Highlights and notes',
+    'detail.annotationOrder': 'Display order',
+    'detail.annotationOrderAsc': 'Oldest first',
+    'detail.annotationOrderDesc': 'Newest first',
     'detail.notePrefix': 'Note: ',
     'detail.emptyTitle': 'No highlights or notes were found on this Mac',
     'detail.emptyCopy': 'A book appearing in your library does not mean its annotations have already synced from iCloud. If the book has not been downloaded, download and open it once in Apple Books, wait for syncing to finish, then refresh this page. If its annotations still do not appear, restart this tool and try again.',
@@ -574,7 +585,12 @@ function renderAnnualTrend() {
     return curves + dots;
   }).join('');
 
-  const legend = series.map((item) => `<div class="trend-metric trend-${item.className}"><span><i></i>${escapeHTML(item.label)}</span><strong data-trend-value="${item.field}"></strong></div>`).join('');
+  const legend = series.map((item) => {
+    const content = `<span><i></i>${escapeHTML(item.label)}</span><strong data-trend-value="${item.field}"></strong>`;
+    return item.field === 'finishedBooks'
+      ? `<button type="button" class="trend-metric trend-finished trend-metric-link" id="trend-finished-books">${content}${renderLibraryLinkHint()}</button>`
+      : `<div class="trend-metric trend-${item.className}">${content}</div>`;
+  }).join('');
   const yearTargets = reports.map((report, index) => {
     const left = index === 0 ? padding.left : (x(index - 1) + x(index)) / 2;
     const right = index === reports.length - 1 ? width - padding.right : (x(index) + x(index + 1)) / 2;
@@ -590,6 +606,7 @@ function renderAnnualTrend() {
     </div>`;
   const selectYear = (index) => {
     const report = reports[index];
+    state.trendYear = report.year;
     elements.annualTrend.querySelector('#trend-selected-year').textContent = String(report.year);
     series.forEach((item) => {
       const value = item.available && !item.available(report) ? '—' : item.format(Number(report[item.field] || 0));
@@ -611,7 +628,11 @@ function renderAnnualTrend() {
       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(); }
     });
   });
-  selectYear(reports.length - 1);
+  elements.annualTrend.querySelector('#trend-finished-books').addEventListener('click', () => {
+    applyStatusFilter('finished', String(state.trendYear));
+  });
+  const selectedIndex = reports.findIndex((report) => report.year === state.trendYear);
+  selectYear(selectedIndex >= 0 ? selectedIndex : reports.length - 1);
 }
 
 function updateReportYears() {
@@ -631,10 +652,14 @@ function updateReportYears() {
   if ([...years].some((year) => String(year) === previousValue)) elements.reportYear.value = previousValue;
 }
 
-function updateYearOptions() {
+function updateYearOptions(selectedYear = elements.yearFilter.value) {
   const showsFinishedYears = elements.status.value === 'finished';
-  const years = showsFinishedYears ? state.finishedYears : state.collectionYears;
-  const previousValue = elements.yearFilter.value;
+  const years = [...(showsFinishedYears ? state.finishedYears : state.collectionYears)];
+  // Reports can link to a year with no books; keep that filter instead of showing all years.
+  if (selectedYear && !years.some(({ year }) => String(year) === selectedYear)) {
+    years.push({ year: Number(selectedYear), count: 0 });
+    years.sort((left, right) => right.year - left.year);
+  }
   elements.yearFilter.replaceChildren();
 
   const allYears = document.createElement('option');
@@ -647,7 +672,7 @@ function updateYearOptions() {
     option.textContent = t('year.option', { year, count: count.toLocaleString(displayLocale()) });
     elements.yearFilter.append(option);
   });
-  if (years.some(({ year }) => String(year) === previousValue)) elements.yearFilter.value = previousValue;
+  elements.yearFilter.value = selectedYear;
   elements.yearFilterHint.textContent = showsFinishedYears ? t('year.finishedHint') : t('year.collectionHint');
 }
 
@@ -721,6 +746,10 @@ async function loadYearReport() {
   }
 }
 
+function renderLibraryLinkHint() {
+  return `<em class="metric-link-hint">${t('library.viewBooks')}</em>`;
+}
+
 function renderYearReport(report) {
   const monthFormatter = new Intl.DateTimeFormat(displayLocale(), { month: 'short' });
   const annotationBars = renderMonthChart(report, 'annotationCount', (value) => value.toLocaleString(displayLocale()), monthFormatter);
@@ -735,8 +764,8 @@ function renderYearReport(report) {
     : `<p class="report-empty">${t('report.noTopBooks')}</p>`;
   elements.reportContent.innerHTML = `
     <div class="report-metrics">
-      <div><strong>${report.collectedBooks}</strong><span>${t('report.collected')}</span></div>
-      <div><strong>${report.finishedBooks}</strong><span>${t('report.finished')}</span></div>
+      <button type="button" class="report-metric-link" data-library-status="all"><strong>${report.collectedBooks}</strong><span>${t('report.collected')}</span>${renderLibraryLinkHint()}</button>
+      <button type="button" class="report-metric-link" data-library-status="finished"><strong>${report.finishedBooks}</strong><span>${t('report.finished')}</span>${renderLibraryLinkHint()}</button>
       <div><strong>${report.annotationCount}</strong><span>${t('report.annotations')}</span></div>
       <div><strong>${report.noteCount}</strong><span>${t('report.notes')}</span></div>
       <div><strong>${report.activeDays}</strong><span>${t('report.activeDays')}</span></div>
@@ -746,6 +775,9 @@ function renderYearReport(report) {
     <h3>${t('report.monthly')}</h3><div class="month-chart">${annotationBars}</div>
     <h3>${t('report.topBooks')}</h3><div class="report-ranking">${topBooks}</div>`;
   elements.reportContent.querySelectorAll('[data-book-id]').forEach((button) => button.addEventListener('click', () => openBook(button.dataset.bookId)));
+  elements.reportContent.querySelectorAll('[data-library-status]').forEach((button) => {
+    button.addEventListener('click', () => applyStatusFilter(button.dataset.libraryStatus, String(report.year)));
+  });
 }
 
 function renderMonthChart(report, field, formatValue, monthFormatter) {
@@ -860,16 +892,20 @@ function updateWantToReadPagination() {
 }
 
 async function loadBooks() {
+  const requestID = ++state.bookRequestID;
   elements.grid.innerHTML = `<div class="loading">${t('books.loading')}</div>`;
   elements.empty.hidden = true;
   try {
     const page = await requestJSON(`/api/books?${queryParameters()}`);
+    if (requestID !== state.bookRequestID) return;
     state.total = page.total;
     renderBooks(page.items);
     updatePagination();
     elements.count.textContent = t('books.count', { count: page.total.toLocaleString(displayLocale()) });
     elements.exportLink.href = `/api/export/books.csv?${queryParameters(false)}`;
   } catch (error) {
+    if (requestID !== state.bookRequestID) return;
+    console.error('Failed to load library books', { filters: queryParameters().toString(), error });
     elements.grid.innerHTML = '';
     showToast(error.message);
   }
@@ -921,12 +957,14 @@ function updateStatusFilterState() {
   });
 }
 
-function applyStatusFilter(status) {
+function applyStatusFilter(status, year = '') {
+  window.clearTimeout(state.searchTimer);
+  elements.search.value = '';
   elements.status.value = status;
-  elements.yearFilter.value = '';
-  updateYearOptions();
+  updateYearOptions(year);
   state.offset = 0;
   updateStatusFilterState();
+  console.debug('Navigating to library', { status, year });
   loadBooks();
   scrollToLibrary();
 }
@@ -955,10 +993,11 @@ function annotationExportURL(bookID) {
   return `/api/books/${bookID}/annotations.md?${parameters}`;
 }
 
-function renderBookDetail(book, annotations) {
-  const percent = Math.max(0, Math.min(100, book.progress * 100));
-  const annotationHTML = annotations.length
-    ? annotations.map((annotation) => `
+function renderDetailAnnotations(annotations) {
+  // The API returns annotations from newest to oldest; preserve its source array.
+  const orderedAnnotations = state.detailAnnotationOrder === 'asc' ? [...annotations].reverse() : annotations;
+  return orderedAnnotations.length
+    ? orderedAnnotations.map((annotation) => `
       <article class="annotation annotation-style-${annotation.style}">
         ${annotation.selectedText ? `<blockquote>“${escapeHTML(annotation.selectedText)}”</blockquote>` : `<blockquote>${t('annotation.bookmark')}</blockquote>`}
         ${annotation.note ? `<p class="annotation-note">${t('detail.notePrefix')}${escapeHTML(annotation.note)}</p>` : ''}
@@ -968,6 +1007,30 @@ function renderBookDetail(book, annotations) {
         <strong>${t('detail.emptyTitle')}</strong>
         <p>${t('detail.emptyCopy')}</p>
       </div>`;
+}
+
+function renderDetailDate(label, value, source = '') {
+  let dateHTML = '<span class="detail-fact-value">—</span>';
+  if (value) {
+    const date = new Date(value);
+    const dateOptions = state.language === 'zh-CN'
+      ? { year: 'numeric', month: '2-digit', day: '2-digit' }
+      : { dateStyle: 'medium' };
+    const dateText = new Intl.DateTimeFormat(displayLocale(), dateOptions).format(date);
+    const timeText = new Intl.DateTimeFormat(displayLocale(), { timeStyle: 'short' }).format(date);
+    dateHTML = `<time datetime="${date.toISOString()}">
+      <span class="detail-fact-value">${escapeHTML(dateText)}</span>
+      <span class="detail-fact-time">${escapeHTML(timeText)}</span>
+    </time>`;
+  }
+  return `<div class="detail-fact">
+    <dt>${escapeHTML(label)}</dt>
+    <dd>${dateHTML}${source ? `<span class="detail-fact-source">${escapeHTML(source)}</span>` : ''}</dd>
+  </div>`;
+}
+
+function renderBookDetail(book, annotations) {
+  const percent = Math.max(0, Math.min(100, book.progress * 100));
   elements.dialogContent.innerHTML = `
     <header class="detail-header">
       <p class="eyebrow">${statusText(book.status)}</p>
@@ -980,14 +1043,30 @@ function renderBookDetail(book, annotations) {
       <label class="detail-export-option"><input type="checkbox" id="hide-export-metadata" ${state.hideExportMetadata ? 'checked' : ''}>${t('detail.hideExportMetadata')}</label>
       <label class="detail-export-option"><input type="checkbox" id="hide-export-lines" ${state.hideExportLines ? 'checked' : ''}>${t('detail.hideExportLines')}</label>
     </header>
-    <div class="detail-facts">
-      <div><span>${t('detail.collectedAt')}</span>${formatDate(book.collectedAt)}${book.collectionSource ? ` · ${collectionSourceText(book.collectionSource)}` : ''}</div>
-      <div><span>${t('detail.lastOpenedAt')}</span>${formatDate(book.lastOpenedAt)}</div>
-      <div><span>${t('detail.finishedAt')}</span>${formatDate(book.finishedAt)}</div>
-      <div><span>${t('detail.annotations')}</span>${book.annotationCount.toLocaleString(displayLocale())}</div>
-    </div>
+    <dl class="detail-facts">
+      ${renderDetailDate(t('detail.collectedAt'), book.collectedAt, book.collectionSource ? collectionSourceText(book.collectionSource) : '')}
+      ${renderDetailDate(t('detail.lastOpenedAt'), book.lastOpenedAt)}
+      ${renderDetailDate(t('detail.finishedAt'), book.finishedAt)}
+      <div class="detail-fact"><dt>${t('detail.annotations')}</dt><dd class="detail-fact-value detail-fact-count">${book.annotationCount.toLocaleString(displayLocale())}</dd></div>
+    </dl>
     ${book.description ? `<p class="detail-description">${escapeHTML(book.description)}</p>` : ''}
-    <section class="annotations"><h3>${t('detail.annotationsAndNotes')}</h3>${annotationHTML}</section>`;
+    <section class="annotations">
+      <div class="detail-annotations-heading">
+        <h3>${t('detail.annotationsAndNotes')}</h3>
+        <label class="detail-annotation-order" for="detail-annotation-order">${t('detail.annotationOrder')}
+          <select id="detail-annotation-order">
+            <option value="asc" ${state.detailAnnotationOrder === 'asc' ? 'selected' : ''}>${t('detail.annotationOrderAsc')}</option>
+            <option value="desc" ${state.detailAnnotationOrder === 'desc' ? 'selected' : ''}>${t('detail.annotationOrderDesc')}</option>
+          </select>
+        </label>
+      </div>
+      <div id="detail-annotations-list">${renderDetailAnnotations(annotations)}</div>
+    </section>`;
+  elements.dialogContent.querySelector('#detail-annotation-order').addEventListener('change', (event) => {
+    state.detailAnnotationOrder = event.target.value;
+    console.debug('Book annotation display order changed', { bookID: book.id, order: state.detailAnnotationOrder, count: annotations.length });
+    elements.dialogContent.querySelector('#detail-annotations-list').innerHTML = renderDetailAnnotations(annotations);
+  });
   elements.dialogContent.querySelector('#hide-export-metadata').addEventListener('change', (event) => {
     state.hideExportMetadata = event.target.checked;
     elements.dialogContent.querySelector('.detail-export').href = annotationExportURL(book.id);

@@ -3,12 +3,70 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"apple-books/internal/domain"
 )
+
+func TestStoreRemainsUsableWhenReadingHistoryCannotOpen(t *testing.T) {
+	for _, failure := range []string{"missing", "corrupt", "unsupported schema"} {
+		t.Run(failure, func(t *testing.T) {
+			directory := t.TempDir()
+			libraryPath := filepath.Join(directory, "library.sqlite")
+			annotationPath := filepath.Join(directory, "annotations.sqlite")
+			historyPath := filepath.Join(directory, "reading history.sqlite")
+			createLibraryFixture(t, libraryPath)
+			createAnnotationFixture(t, annotationPath)
+			switch failure {
+			case "corrupt":
+				if err := os.WriteFile(historyPath, []byte("invalid database"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			case "unsupported schema":
+				createAnnotationFixture(t, historyPath)
+			}
+
+			reader, err := Open(libraryPath, annotationPath, historyPath)
+			if err != nil {
+				t.Fatalf("optional history failure prevented startup: %v", err)
+			}
+			t.Cleanup(func() {
+				if err := reader.Close(); err != nil {
+					t.Errorf("Close() error = %v", err)
+				}
+			})
+			summary, err := reader.Summary(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if summary.TotalBooks != 2 || summary.AnnotationCount != 1 {
+				t.Fatalf("library and annotations unavailable: %+v", summary)
+			}
+			if summary.ReadingTimeAvailable || !strings.Contains(summary.ReadingTimeError, historyPath) {
+				t.Fatalf("history failure missing from summary: %+v", summary)
+			}
+			if failure == "corrupt" && strings.Contains(summary.ReadingTimeError, "unsupported schema") {
+				t.Fatalf("database read error incorrectly reported as schema mismatch: %s", summary.ReadingTimeError)
+			}
+			report, err := reader.YearReport(context.Background(), 2026)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.ReadingTimeAvailable || report.ReadingTimeError != summary.ReadingTimeError {
+				t.Fatalf("history failure missing from year report: %+v", report)
+			}
+			if failure == "missing" {
+				if _, err := os.Stat(historyPath); !os.IsNotExist(err) {
+					t.Fatalf("read-only open created missing database: %v", err)
+				}
+			}
+		})
+	}
+}
 
 func TestAppleTime(t *testing.T) {
 	converted := appleTime(sql.NullFloat64{Float64: 0, Valid: true})

@@ -34,6 +34,8 @@ Then open:
 
 Automatic discovery is recommended because recent Apple Books changes may still be stored in SQLite WAL files. The databases are opened in read-only mode, so the application can read those records without writing data or running migrations.
 
+If the reading-history database cannot be opened, the application still starts and the library and annotation features remain available. The reading-time area shows the error, and the logs include the full database path. Restart the application after resolving the file access issue to reconnect to reading history.
+
 ### iCloud Books and Annotation Sync
 
 Apple Books may sync book metadata, ebook files, and annotations separately. A book appearing in your library or Reading Now list does not necessarily mean its highlights and notes have already been written to the local `AEAnnotation` database. For a book that exists only in iCloud and has not been downloaded, this tool may report that no local highlights or notes were found, and its exported Markdown may contain no annotation body.
@@ -121,6 +123,8 @@ Highlight and note text can still be exported from the SQLite databases, but cha
 2. Select its card to open the detail view.
 3. Select “Export highlights and notes”.
 4. The browser downloads a Markdown file named after the book.
+
+The detail view shows all highlights and notes for the book that have synced locally, without pagination. Entries appear oldest first by creation time by default. Use “Display order” beside “Highlights and notes” to switch to newest first. This option controls the page display; Markdown remains organized by chapter and position in the book.
 
 “Hide quote bars and separator lines” is also checked by default. Excerpts use plain paragraphs separated by blank lines. Uncheck it to restore block quotes and horizontal rules, independently of the types and timestamps option.
 

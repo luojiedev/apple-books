@@ -25,9 +25,10 @@ const appleEpochOffset = 978307200
 const wantToReadCollectionID = "Want_To_Read_Collection_ID"
 
 type Store struct {
-	library    *sql.DB
-	annotation *sql.DB
-	history    *readinghistory.Reader
+	library      *sql.DB
+	annotation   *sql.DB
+	history      *readinghistory.Reader
+	historyError error
 }
 
 func Open(libraryPath, annotationPath string, readingHistoryPath ...string) (*Store, error) {
@@ -45,8 +46,10 @@ func Open(libraryPath, annotationPath string, readingHistoryPath ...string) (*St
 	if len(readingHistoryPath) > 0 && readingHistoryPath[0] != "" {
 		store.history, err = readinghistory.Open(readingHistoryPath[0])
 		if err != nil {
-			_ = store.Close()
-			return nil, fmt.Errorf("open reading history database: %w", err)
+			store.historyError = err
+			log.Error("reading history unavailable; continuing with library and annotations", "path", readingHistoryPath[0], "error", err)
+		} else {
+			log.Debug("Apple Books reading history database opened", "path", readingHistoryPath[0])
 		}
 	}
 	if err := store.validateSchema(context.Background()); err != nil {
@@ -149,6 +152,9 @@ func (s *Store) Summary(ctx context.Context) (domain.Summary, error) {
 	}
 	summary.AnnotationYears = annotationYears
 	log.Debug("Apple Books annotation years loaded", "years", summary.AnnotationYears)
+	if s.historyError != nil {
+		summary.ReadingTimeError = s.historyError.Error()
+	}
 	if s.history != nil {
 		summary.ReadingYears, summary.ReadingSeconds, err = s.history.Totals(ctx)
 		if err != nil {
@@ -884,6 +890,9 @@ func (s *Store) YearReport(ctx context.Context, year int) (domain.YearReport, er
 		return domain.YearReport{}, fmt.Errorf("iterate year report annotations: %w", err)
 	}
 	report.ActiveDays = len(activeDates)
+	if s.historyError != nil {
+		report.ReadingTimeError = s.historyError.Error()
+	}
 	if s.history != nil {
 		readingYear, historyErr := s.history.Year(ctx, year)
 		if historyErr != nil {
