@@ -35,7 +35,7 @@ go run ./cmd/apple-books
 
 第一次试用：找到一本有高亮的书 → 打开详情 → 点击 **“导出本书高亮与笔记”** → 获得 Markdown 文件。
 
-- 遇到权限问题？查看 [macOS 权限设置](docs/guide.md#macos-权限)。
+- 遇到权限问题，或日志出现 `unable to open database file: out of memory (14)`？这不一定是内存不足，请先按 [macOS 权限设置](docs/guide.md#macos-权限) 排查启动程序的终端或 IDE 的访问权限。
 - 使用 Windows / Linux，或需要手动指定数据库？查看 [使用指南](docs/guide.md)。
 
 ## 界面预览

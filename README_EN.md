@@ -35,7 +35,7 @@ Open **<http://127.0.0.1:8787>**. The application automatically discovers your l
 
 Try it: find a book with highlights → open its details → click **“Export highlights and notes”** → save the Markdown file.
 
-- Permission error? See [macOS permissions](docs/guide.en.md#macos-permissions).
+- Permission error, or `unable to open database file: out of memory (14)` in the logs? This does not necessarily mean low memory. Check the access permissions of the terminal or IDE that launches the tool using the [macOS permissions guide](docs/guide.en.md#macos-permissions).
 - On Windows / Linux, or using database snapshots? See the [user guide](docs/guide.en.md).
 
 ## Screenshots

@@ -53,16 +53,27 @@ Apple Books 会分别同步书籍元数据、电子书文件和批注。一本�
 
 ### macOS 权限
 
-首次访问 Apple Books 容器时，macOS 可能要求授权。请允许启动程序的应用访问相关文件，例如 Terminal、iTerm、IDE 或 Codex。
+首次访问 Apple Books 容器时，macOS 可能要求授权。请允许启动程序的应用访问相关文件，例如 Terminal、iTerm2、Ghostty、Warp、IDE 或 Codex。
+
+日志中的 `unable to open database file: out of memory (14)` 也可能与文件访问权限有关。SQLite 错误码 `14` 表示 `SQLITE_CANTOPEN`（无法打开数据库文件）；不能仅凭附带的 `out of memory` 文案判断内存不足。如果同一程序在一个终端或 Codex 中能读取数据库，在另一个应用中失败，应优先检查实际启动程序的应用权限。此错误也可能由路径不存在或数据库及其 `-wal`、`-shm` 辅助文件无法访问引起，并不专指权限问题。
 
 如果没有出现弹窗，但日志显示 `operation not permitted` 或 `permission denied`：
 
 1. 打开“系统设置”。
 2. 进入“隐私与安全性” → “完全磁盘访问权限”。
-3. 为启动本程序的 Terminal、IDE 或 Codex 开启权限。
+3. 为实际启动本程序的应用开启权限，例如 iTerm2、Ghostty、Warp、Terminal、IDE 或 Codex；只为其他终端授权不会解决当前应用的权限问题。
 4. 完全退出并重新打开该应用，然后再次运行程序。
 
 程序只需要读取权限，不需要修改 Apple Books 数据。
+
+对于上述错误码 `14`，可以先在报错的同一个终端中运行以下只读查询，路径请使用日志中的实际数据库路径：
+
+```bash
+sqlite3 -readonly "/path/from/log/CRDTModelSync-ReadingHistoryModel" \
+  'SELECT COUNT(*) FROM sqlite_master;'
+```
+
+如果查询同样失败，检查路径和文件访问权限；如果查询成功而 Go 程序仍失败，请保留两者的输出继续排查，不要直接认定为权限问题。退出 Apple Books 不会授予终端访问权限，相关后台服务也可能继续运行。不要为了消除报错而删除 `-wal`、`-shm` 文件。
 
 ## 手动复制数据库
 

@@ -53,16 +53,27 @@ The application does not load a permanent in-memory snapshot at startup. Every p
 
 ### macOS Permissions
 
-macOS may request permission the first time the Apple Books container is accessed. Grant access to the application that launches the tool, such as Terminal, iTerm, your IDE, or Codex.
+macOS may request permission the first time the Apple Books container is accessed. Grant access to the application that launches the tool, such as Terminal, iTerm2, Ghostty, Warp, your IDE, or Codex.
+
+The log message `unable to open database file: out of memory (14)` can also indicate a file access problem. SQLite error code `14` means `SQLITE_CANTOPEN` (unable to open the database file); the accompanying `out of memory` text alone does not establish a memory shortage. If the same program can read the database from one terminal or Codex but fails from another application, check the permissions of the application that actually launches it first. A missing path or inaccessible database, `-wal`, or `-shm` file can also cause this error; it does not specifically identify a permission problem.
 
 If no prompt appears but the logs contain `operation not permitted` or `permission denied`:
 
 1. Open System Settings.
 2. Go to Privacy & Security → Full Disk Access.
-3. Enable access for the Terminal, IDE, or Codex instance that launches the tool.
+3. Enable access for the application that actually launches the tool, such as iTerm2, Ghostty, Warp, Terminal, your IDE, or Codex. Granting access to a different terminal does not resolve permissions for the current application.
 4. Quit that application completely, reopen it, and run the tool again.
 
 The tool only needs read access and never needs permission to modify Apple Books data.
+
+For error code `14`, first try this read-only query in the same terminal that reports the failure, replacing the path with the actual database path from the logs:
+
+```bash
+sqlite3 -readonly "/path/from/log/CRDTModelSync-ReadingHistoryModel" \
+  'SELECT COUNT(*) FROM sqlite_master;'
+```
+
+If the query also fails, check the path and file access permissions. If it succeeds but the Go program still fails, keep both outputs for further investigation instead of assuming a permission problem. Quitting Apple Books does not grant terminal access, and related background services may remain running. Do not delete the `-wal` or `-shm` files to suppress the error.
 
 ## Copy the Databases Manually
 
