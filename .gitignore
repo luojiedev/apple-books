@@ -4,3 +4,9 @@
 *.sqlite
 *.sqlite-*
 .DS_Store
+/dist/
+/.pnpm-store/
+/obsidian-plugin/node_modules/
+/obsidian-plugin/main.js
+/obsidian-plugin/build/
+/obsidian-plugin/.test-vault/

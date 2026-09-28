@@ -1,0 +1,26 @@
+{
+  "name": "apple-books-reading-archive",
+  "version": "0.2.1",
+  "private": true,
+  "description": "Apple Books reading archive for Obsidian",
+  "packageManager": "pnpm@11.10.0",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "pnpm typecheck && node esbuild.config.mjs",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "package": "pnpm build && node package.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/sql.js": "^1.4.11",
+    "esbuild": "0.28.2",
+    "obsidian": "1.13.1",
+    "tsx": "^4.21.0",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.9.12",
+    "fflate": "^0.8.3",
+    "sql.js": "^1.14.2"
+  }
+}

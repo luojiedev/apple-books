@@ -23,6 +23,8 @@
 
 ## 快速开始
 
+**使用 Obsidian？** 现在可以将阅读档案作为插件使用，在 Obsidian 内浏览书库、回顾摘录、查看年度报告并同步 Markdown。插件直接只读访问 Apple Books 数据库，SQLite 引擎随插件打包，无需 Go 或辅助程序。查看 [Obsidian 插件安装与使用](docs/obsidian.md)。插件尚未上架社区目录。
+
 推荐在 **macOS** 上使用，需安装 **Git** 和 **Go 1.25 或更高版本**。先在 Apple Books 中确认需要的书籍和批注已同步到本机。
 
 ```bash

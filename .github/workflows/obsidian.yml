@@ -1,0 +1,47 @@
+name: Obsidian plugin
+on:
+  push:
+    tags: ['obsidian-*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: obsidian-plugin/package.json
+      - run: pnpm install --frozen-lockfile
+        working-directory: obsidian-plugin
+      - run: pnpm test
+        working-directory: obsidian-plugin
+      - run: pnpm package
+        working-directory: obsidian-plugin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-plugin
+          path: dist/obsidian-*
+  release:
+    if: startsWith(github.ref, 'refs/tags/obsidian-')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: obsidian-plugin
+          path: release
+      - name: Validate tag and create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          test "$RELEASE_TAG" = "obsidian-$(jq -r .version release/manifest.json)"
+          gh release create "$RELEASE_TAG" release/* --draft --title "Apple Books for Obsidian ${RELEASE_TAG#obsidian-}" --notes "Self-contained macOS plugin with bundled SQLite. No helper executable or server required. See docs/obsidian.md for installation and sync behavior."

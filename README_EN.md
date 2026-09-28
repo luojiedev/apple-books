@@ -23,6 +23,8 @@ Also includes library search and filters, Want to Read, a random book picker, li
 
 ## Quick start
 
+**Using Obsidian?** The reading archive is also available as a macOS desktop plugin, with library browsing, highlight search, random review, annual reports, and Markdown sync. The plugin reads Apple Books databases directly using bundled SQLite; no Go runtime, helper executable, or server is required. See the [Obsidian installation and usage guide (Chinese)](docs/obsidian.md). The plugin has not been submitted to the community directory yet.
+
 **macOS** is recommended. Install **Git** and **Go 1.25 or later**, and make sure the books and annotations you want have synced locally in Apple Books.
 
 ```bash
