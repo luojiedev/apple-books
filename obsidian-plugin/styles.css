@@ -42,3 +42,13 @@
 .abr-settings code { overflow-wrap: anywhere; font-size: 11px; user-select: text; }
 @container (max-width: 700px) { .abr-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .abr-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .abr-header h1 { font-size: 24px; } }
+.abr-sync-status { display: block; width: 100%; white-space: normal; text-align: left; height: auto; padding: 10px 12px; margin-bottom: 18px; color: var(--text-muted); line-height: 1.6; }
+.abr-template-settings textarea { min-width: 280px; width: 100%; font-family: var(--font-monospace); }
+.abr-template-settings .setting-item { flex-wrap: wrap; gap: 12px; }
+.abr-template-preview, .abr-difference pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; font-family: var(--font-monospace); padding: 12px; background: var(--background-secondary); user-select: text; }
+.abr-template-preview:empty { display: none; }
+.abr-conflict-modal { width: min(1000px, 92vw); }
+.abr-difference { padding: 12px 0 20px; border-bottom: 1px solid var(--background-modifier-border); }
+.abr-diff-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.abr-diff-columns > div { min-width: 0; }
+@media (max-width: 700px) { .abr-diff-columns { grid-template-columns: 1fr; } .abr-template-settings textarea { min-width: 0; } }

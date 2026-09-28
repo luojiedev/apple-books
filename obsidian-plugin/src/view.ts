@@ -41,7 +41,12 @@ export class ArchiveView extends ItemView {
   getViewType(): string { return VIEW_TYPE; }
   getDisplayText(): string { return "Apple Books 阅读档案"; }
   getIcon(): string { return "book-open"; }
-  async onOpen(): Promise<void> { await this.show("overview"); }
+  async onOpen(): Promise<void> {
+    this.register(this.plugin.subscribeStatus(() => {
+      this.contentEl.querySelector<HTMLElement>(".abr-sync-status")?.setText(this.plugin.syncStatus());
+    }));
+    await this.show("overview");
+  }
   async onClose(): Promise<void> { this.generation++; this.contentEl.empty(); }
 
   private async show(tab: Tab): Promise<void> {
@@ -57,6 +62,8 @@ export class ArchiveView extends ItemView {
     const actions = header.createDiv({ cls: "abr-actions" });
     button(actions, "设置与连接", () => this.plugin.openSetup());
     button(actions, "同步高亮与笔记", () => this.plugin.syncBooks(), true);
+    const status = button(this.contentEl, this.plugin.syncStatus(), () => this.plugin.showSyncResult());
+    status.addClass("abr-sync-status");
     const tabs = this.contentEl.createDiv({ cls: "abr-tabs", attr: { role: "tablist" } });
     for (const [id, label] of [["overview", "阅读概览"], ["books", "我的书库"], ["search", "搜索摘录"], ["report", "年度报告"]] as const) {
       const element = button(tabs, label, () => { if (id !== this.tab) return this.show(id); });
@@ -280,7 +287,7 @@ export class ResultModal extends Modal {
   constructor(app: App, private plugin: AppleBooksPlugin, private result: SyncResult) { super(app); }
   onOpen(): void {
     this.setTitle(this.result.failures.length ? "同步完成，部分书籍需要处理" : "阅读笔记已同步");
-    this.contentEl.createEl("p", { text: `新增 ${this.result.created} 本 · 更新 ${this.result.updated} 本 · 无变化 ${this.result.unchanged} 本 · 未同步 ${this.result.failures.length} 本` });
+    this.contentEl.createEl("p", { text: `新增 ${this.result.created} 本 · 更新 ${this.result.updated} 本 · 无变化 ${this.result.unchanged} 本（增量跳过 ${this.result.skipped} 本）· 未同步 ${this.result.failures.length} 本` });
     this.contentEl.createEl("p", { text: "请在自动生成区域外撰写个人心得。重复同步不会重复添加摘录。" });
     if (this.result.paths.length === 1 && this.result.paths[0]) {
       const path = this.result.paths[0];
@@ -290,6 +297,8 @@ export class ResultModal extends Modal {
       const section = this.contentEl.createDiv({ cls: "abr-search-result" });
       section.createEl("strong", { text: failure.title });
       section.createEl("p", { text: failure.message });
+      if (failure.canResolve) button(section, "对比并处理", () => { this.close(); this.plugin.openConflict(failure); }, true);
+      else if (failure.path) button(section, "打开笔记检查", () => this.plugin.openNote(failure.path!));
     }
   }
   onClose(): void { this.contentEl.empty(); this.plugin.releaseModal(this); }

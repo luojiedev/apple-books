@@ -58,17 +58,34 @@ export interface YearReport {
   topBooks: { book: Book; annotationCount: number }[];
 }
 
-export interface Settings {
+export interface DocumentOptions {
+  fileNameTemplate: string;
+  bodyTemplate: string;
+  includeBookProperties: boolean;
+}
+
+export const DEFAULT_DOCUMENT_OPTIONS: DocumentOptions = {
+  fileNameTemplate: "{{title}} — {{id}}",
+  bodyTemplate: "# {{title}}\n\n作者：{{author}}\n阅读状态：{{status}}\n高亮与笔记：{{annotation_count}} 条\n\n{{chapter_notice}}{{annotations}}",
+  includeBookProperties: true,
+};
+
+export interface Settings extends DocumentOptions {
   outputFolder: string;
   syncOnStartup: boolean;
+  autoSync: boolean;
+  syncIntervalMinutes: number;
   libraryDB: string;
   annotationDB: string;
   readingHistoryDB: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  ...DEFAULT_DOCUMENT_OPTIONS,
   outputFolder: "Apple Books",
   syncOnStartup: false,
+  autoSync: false,
+  syncIntervalMinutes: 5,
   libraryDB: "",
   annotationDB: "",
   readingHistoryDB: "",
@@ -76,6 +93,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export interface Library {
   call<T>(method: string, params?: Record<string, unknown>): Promise<T>;
+  syncIndex?(): Promise<{ book: Book; revision: string }[]>;
 }
 
 export function errorMessage(error: unknown): string {

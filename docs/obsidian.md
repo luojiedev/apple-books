@@ -2,11 +2,11 @@
 
 插件直接读取本机 Apple Books 的 SQLite 数据库。可以在 Obsidian 内浏览书库、搜索摘录、随机回顾、查看年度报告，并将高亮与笔记同步为 Markdown。业务代码使用 TypeScript，SQLite 的 JavaScript 引擎随 `main.js` 一起发布，无需 Go、外部可执行程序或服务器。
 
-当前版本 **0.2.1**，适用于 **macOS 的 Obsidian 桌面版 1.8.0 及以上**。Apple 芯片和 Intel Mac 使用同一个安装包。移动端、Windows 和 Linux 可以阅读已同步的 Markdown，但不能运行本插件。源数据需先通过 Apple Books 同步到这台 Mac。
+当前版本 **0.3.0**，适用于 **macOS 的 Obsidian 桌面版 1.8.0 及以上**。Apple 芯片和 Intel Mac 使用同一个安装包。移动端、Windows 和 Linux 可以阅读已同步的 Markdown，但不能运行本插件。源数据需先通过 Apple Books 同步到这台 Mac。
 
 ## 安装：不需要 Go、Git 或终端
 
-1. 下载 `apple-books-reading-archive.zip`。本地构建产物在 `dist/obsidian-0.2.1/`。
+1. 下载 `apple-books-reading-archive.zip`。本地构建产物在 `dist/obsidian-0.3.0/`。
 2. 解压，将整个 `apple-books-reading-archive` 文件夹放进你的 Obsidian 仓库下的 `.obsidian/plugins/`。Finder 中可按 `Command + Shift + .` 显示隐藏文件夹。
 3. 在 Obsidian「设置 → 第三方插件」中启用 **Apple Books Reading Archive**；必要时重新启动 Obsidian。
 4. 点击左侧书本图标，进入阅读档案。插件自动发现书库，直接在内存中读取数据。
@@ -31,15 +31,50 @@
 - **搜索摘录**：跨书搜索高亮正文与 Apple Books 个人笔记，点击书名查看详情。
 - **年度报告**：年度读完数量、阅读时长、批注活跃日、月度分布与批注最多的书。
 - **同步高亮与笔记**：同步所有有批注的书，以及此前同步过、但后来删掉了全部批注的书。没有批注且从未同步的书不会批量生成空文件；仍可在书库中手动选中同步。
-- **启动时同步**：默认关闭，可在插件设置开启。出现冲突时会展示具体书籍与原因。
+- **启动时同步**：默认关闭，可在插件设置开启。与定时同步独立，结果显示在同步状态中。
+- **自动增量同步**：默认关闭，开启后每 5 分钟检查一次，可设置 1–1440 分钟。后台同步不弹窗，状态栏和阅读档案中显示上次完成时间、结果及待处理数量。
+- **同步结果与冲突**：点击状态栏、阅读档案中的同步状态，或运行「查看上次同步结果与冲突」命令。结果会保存在插件设置数据中，重启后仍可查看。
 
 阅读时长使用 TypeScript 解析本项目已支持的 ReadingHistoryModel CRDT v4。缺失或不支持时显示「暂不可用」，不会显示为零或根据批注日期推测时长。章节识别需要本机可访问、无 DRM 限制且结构可解析的 EPUB；无法解析时仍可同步正文。
+
+## 自动同步与模板
+
+自动同步仅在 Obsidian 打开且插件启用时运行。上一次检查结束后才安排下一次，不会同时运行两轮；停用插件时停止计时。它比较每本书的来源指纹、本地笔记内容和模板设置，三者均未变化时跳过读取本书完整摘录及章节解析，不重写文件。指纹仅保留摘要，不在设置数据中保存摘录正文。
+
+为发现改名、移动、删除和手动编辑，检查时仍会扫描仓库 Markdown；不是完全无文件读取的监听器。数据库中书籍和批注的变化会触发同步。如果仅修改了 EPUB 目录文件而书库记录未变，请手动点击「同步高亮与笔记」，手动同步始终重新检查章节。
+
+在「设置与连接 → 笔记模板与书籍属性」中编辑，先点击「预览示例」，再「保存模板」。预览使用虚构数据，不创建笔记。模板采用纯文本变量替换，不执行 JavaScript 或其他脚本。
+
+文件名支持 `{{title}}`、`{{author}}`、`{{id}}`，例如 `{{author}}/{{title}} — {{id}}` 会按作者创建子目录。缺少 `{{id}}` 时自动追加摘要以区分同名书。模板仅影响新笔记，已同步笔记保持现有位置和文件名。
+
+正文支持 `{{title}}`、`{{author}}`、`{{status}}`、`{{progress}}`、`{{annotation_count}}`、`{{finished_at}}`、`{{chapter_notice}}`、`{{annotations}}`。其中 `{{annotations}}` 必须且只能出现一次。正文模板只应用于自动生成区域，原始书名、作者与摘录仍会进行 Markdown 转义。例如：
+
+```markdown
+# {{title}}
+
+作者：{{author}} · {{status}} · {{progress}}
+
+{{chapter_notice}}{{annotations}}
+```
+
+开启「同步书籍属性」后，插件在 frontmatter 内维护带校验标记的独立区域：
+
+| 属性 | 内容 |
+| --- | --- |
+| `apple_books_title` | 书名 |
+| `apple_books_author` | 作者 |
+| `apple_books_status` | `unread`、`reading` 或 `finished` |
+| `apple_books_progress` | 0–100 的阅读进度 |
+| `apple_books_annotation_count` | 本次同步的高亮和笔记条数 |
+| `apple_books_finished_at` | 完成时间，缺失时为 `null` |
+
+个人属性、注释和标签保持原样。手动修改专用属性区域会进入冲突处理；如果已有同名属性但不属于插件区域，会停止更新并提示重命名或关闭属性同步。关闭该选项保留已有属性，但不再更新。原有 `apple_books_asset_id` 继续用于识别笔记。
 
 ## 同步规则与个人内容保护
 
 每本书对应一个 Markdown 文件。书籍通过 `assetId` 识别，批注通过 `UUID` 生成稳定块标识。文件名包含书名与书籍标识摘要，同名书不会混写。
 
-文件中的 `<!-- apple-books:begin ... -->` 到 `<!-- apple-books:end -->` 为自动生成区域。**请把自己的心得写在标记外**，例如默认的「我的读书心得」章节。标记外的正文和已有 frontmatter 属性均保持原样。
+文件中的 `<!-- apple-books:begin ... -->` 到 `<!-- apple-books:end -->` 为自动生成区域。**请把自己的心得写在标记外**，例如默认的「我的读书心得」章节。标记外的正文和个人 frontmatter 属性均保持原样；书籍属性仅在其专用区域内更新。
 
 - 重复同步相同内容，不重复追加、不更新时间戳、不重写无变化的文件。
 - 原始书名变化，或你在仓库内改名、移动笔记，仍会更新原文件。插件会扫描仓库 Markdown 中的同步标识。
@@ -48,7 +83,11 @@
 - 标记损坏、同书存在多个同步文件、缺失/重复批注 UUID、目标文件名被其他文件占用时，同样保留现有文件并报告问题。
 - 更新通过 Obsidian `Vault.process()` 读取最新正文后写入，保留同步期间在标记外的编辑。
 
-遇到冲突时，先把需保留的内容移到标记外，再通过 Obsidian 文件恢复或备份还原被修改的自动区域。如果无法恢复，可将整份原笔记移到仓库外保存，再重新同步本书，并手动整理心得。插件不提供静默强制覆盖。
+遇到正文或专用属性冲突时，从同步结果点击「对比并处理」。界面分别列出本地内容和 Apple Books 按当前模板生成的内容，可以逐段选择，也可以全部保留本地或全部采用来源。差异默认选择本地，点击「保存所选结果」才会写入。
+
+保留的本地内容会记录对应的来源摘要。重复同步同样来源时不会改回原文；来源或模板再次变化时会要求重新对比。保存前还会重新检查来源、笔记、模板和重复副本；对比期间任一方发生新修改，保存会被拒绝，需要重新打开对比。关闭对比窗口不修改文件。
+
+标记丢失、重复文件等无法确定目标范围的问题仍需手工处理。对比窗口会说明原因并提供打开笔记入口，插件不会猜测范围或静默强制覆盖。
 
 批注正文按文本转义，不执行来源中的 HTML，也不会把来源里的图片语法或嵌入语法变成远程资源加载。
 
@@ -77,9 +116,9 @@ pnpm package
 
 打包生成单个通用 ZIP 和标准插件文件。修改版本时应同时更新 `manifest.json`、`package.json` 和 `versions.json`。SQLite 使用 sql.js 的 asm.js 分发版本，因此没有 `.node` 原生扩展或运行时 WASM 下载。
 
-测试用 Node 内置 SQLite 创建虚构书库，覆盖真实 WAL 提交/回滚与缓存刷新、只读性、数据库损坏、阅读时长、EPUB 章节和同步冲突；不读取用户的真实 Apple Books 数据。
+测试用 Node 内置 SQLite 创建虚构书库，覆盖真实 WAL 提交/回滚与缓存刷新、只读性、数据库损坏、阅读时长、EPUB 章节、自动同步生命周期、增量缓存、模板、书籍属性、差异合并和并发冲突保护；不读取用户的真实 Apple Books 数据。
 
-`.github/workflows/obsidian.yml` 可以手动构建产物。推送 `obsidian-0.2.0` 形式的标签会生成 **Draft Release**，需要维护者检查后发布。现有 Go Web 工具独立保留，不是插件依赖。
+`.github/workflows/obsidian.yml` 可以手动构建产物。推送 `obsidian-0.3.0` 形式的标签会生成 **Draft Release**，需要维护者检查后发布。现有 Go Web 工具独立保留，不是插件依赖。
 
 ## 代码结构
 
@@ -90,6 +129,9 @@ pnpm package
 - `obsidian-plugin/src/chapters.ts`：EPUB 目录解析与 CFI 章节映射。
 - `obsidian-plugin/src/documents.ts`：稳定标识、Markdown 文本转义、受管区域校验。
 - `obsidian-plugin/src/sync.ts`：串行同步、按书错误隔离、冲突保护。
+- `obsidian-plugin/src/auto-sync.ts`、`sync-state.ts`：定时检查、增量记录和同步状态持久化。
+- `obsidian-plugin/src/templates.ts`：模板变量、路径校验和书籍属性。
+- `obsidian-plugin/src/diff.ts`、`conflicts.ts`：有限大小的逐行对比、逐段选择和保存界面。
 - `obsidian-plugin/src/view.ts`：原生 Obsidian 阅读面板。
 
 此前的 Go 辅助程序、stdio 协议、下载器和安装器均已移除。

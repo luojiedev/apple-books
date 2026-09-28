@@ -59,6 +59,10 @@ export class AppleBooksLibrary implements Library {
 
   constructor(private settings: () => Settings) {}
 
+  async syncIndex(): Promise<{ book: Book; revision: string }[]> {
+    return this.call("syncIndex");
+  }
+
   reset(): void { this.generation++; this.data = undefined; this.signature = ""; }
   dispose(): void { this.disposed = true; this.reset(); }
 
@@ -138,7 +142,7 @@ export class AppleBooksLibrary implements Library {
 }
 
 function validateRequest(method: string, params: Record<string, unknown>): void {
-  if (!["summary", "books", "wantToRead", "book", "search", "review", "report"].includes(method)) throw new Error("未知的书库操作。");
+  if (!["summary", "books", "wantToRead", "book", "search", "review", "report", "syncIndex"].includes(method)) throw new Error("未知的书库操作。");
   for (const [key, minimum, maximum] of [["limit", 1, 100], ["offset", 0, 1000000], ["id", 1, Number.MAX_SAFE_INTEGER], ["year", 1900, 3000]] as const) {
     const value = params[key];
     if (value !== undefined && (typeof value !== "number" || !Number.isSafeInteger(value) || value < minimum || value > maximum)) throw new Error(`无效的查询参数：${key}`);
@@ -160,6 +164,14 @@ function reviews(data: Data): Review[] {
 
 async function dispatch(data: Data, method: string, params: Record<string, unknown>): Promise<unknown> {
   switch (method) {
+    case "syncIndex": {
+      const annotations = new Map<string, SourceAnnotation[]>();
+      for (const annotation of data.annotations) {
+        const items = annotations.get(annotation.assetId) ?? [];
+        items.push(annotation); annotations.set(annotation.assetId, items);
+      }
+      return data.books.map(book => ({ book, revision: createHash("sha256").update(JSON.stringify([book, annotations.get(book.assetId) ?? []])).digest("hex") }));
+    }
     case "summary": return summary(data);
     case "report": return report(data, Number(params.year));
     case "books": {
