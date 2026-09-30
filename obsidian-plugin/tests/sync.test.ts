@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createDocument, documentIdentity, notePath, renderBody, SyncConflict, updateDocument, validateFolder } from "../src/documents.ts";
+import { createDocument, digest, documentIdentity, notePath, renderBody, SyncConflict, updateDocument, validateFolder } from "../src/documents.ts";
 import { SyncEngine, type NoteStore } from "../src/sync.ts";
 import type { Library, Snapshot } from "../src/models.ts";
 
@@ -136,16 +136,31 @@ test("parallel sync is rejected and the engine recovers after a request failure"
   await assert.rejects(engine.sync("Books"), /offline/);
 });
 
-test("stable blocks, numeric CFI order, and CRLF notes survive reimports", () => {
+test("excerpts omit block IDs while preserving separation, numeric CFI order and CRLF reimports", () => {
   const data = snapshot(); data.annotations.reverse();
   const content = createDocument(data);
   assert.ok(content.indexOf("第一条") < content.indexOf("第二条"));
-  const originalID = content.match(/\^ab-[a-f0-9]+/)?.[0];
+  assert.doesNotMatch(content, /\^ab-/);
+  assert.match(content, /> 我的想法\n\n---\n\n> 第二条/);
   data.annotations[1]!.selectedText = "改了正文";
   const updated = updateDocument(content, data);
-  assert.equal(updated.match(/\^ab-[a-f0-9]+/)?.[0], originalID);
+  assert.doesNotMatch(updated, /\^ab-/);
+  assert.match(updated, /> 改了正文/);
   assert.equal(updateDocument(updated.replace(/\n/g, "\r\n"), data), updated.replace(/\n/g, "\r\n"));
   assert.equal(documentIdentity(content), data.book.assetId);
+});
+
+test("sync replaces previously generated block IDs without changing personal reflections", () => {
+  const data = snapshot();
+  const current = createDocument(data) + "保留我的心得\n";
+  const previousBody = renderBody(data).replace("---\n\n", "^ab-0123456789abcdef01234567\n\n");
+  const previous = current.replace(/(<!-- apple-books:begin \S+ )([a-f0-9]{64})( -->\n)[\s\S]*?(?=<!-- apple-books:end -->)/,
+    (_match, prefix: string, _hash: string, suffix: string) => prefix + digest(previousBody) + suffix + previousBody);
+  assert.match(previous, /\^ab-/);
+  const updated = updateDocument(previous, data);
+  assert.equal(updated, current);
+  assert.equal(updateDocument(updated, data), updated);
+  assert.throws(() => updateDocument(previous.replace("第一条", "手写改动"), data), SyncConflict);
 });
 
 test("untrusted content stays text and cannot inject an embed, HTML or sync markers", () => {

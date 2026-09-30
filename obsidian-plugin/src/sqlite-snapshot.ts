@@ -36,7 +36,7 @@ async function readLimited(path: string, optional = false): Promise<Buffer> {
 }
 
 // File metadata alone is insufficient for shm: SQLite updates it through mmap.
-// Read both images twice, bracket them with metadata, and reject active checkpoints.
+// Read the source files twice, bracket them with metadata, and reject changing images.
 export async function readSnapshot(path: string): Promise<Buffer> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const before = await databaseSignature(path);
@@ -84,8 +84,20 @@ export function mergeCommittedWal(database: Buffer, wal: Buffer, shm: Buffer = B
       if (shm.length < 136 || !shm.subarray(0, 48).equals(shm.subarray(48, 96)) || shm[12] !== 1) throw new Error(BUSY);
       const headerSum = checksum(shm.subarray(0, 40), true);
       if (headerSum[0] !== shm.readUInt32LE(40) || headerSum[1] !== shm.readUInt32LE(44)) throw new Error(BUSY);
-      if (!shm.subarray(32, 40).equals(wal.subarray(16, 24)) || shm.readUInt32LE(128) > shm.readUInt32LE(96)) throw new Error(BUSY);
+      if (!shm.subarray(32, 40).equals(wal.subarray(16, 24))) throw new Error(BUSY);
       publishedFrames = shm.readUInt32LE(16);
+      const backfilledFrames = shm.readUInt32LE(96);
+      const attemptedFrames = shm.readUInt32LE(128);
+      // SQLite recovery sets nBackfill=0 and nBackfillAttempted=mxFrame.
+      // An interrupted checkpoint can leave the same gap; it is not a busy flag.
+      // Replaying every committed frame below repairs any partial backfill.
+      // Both counters must still stay within the published commit boundary.
+      // https://github.com/sqlite/sqlite/blob/master/src/wal.c (WalCkptInfo)
+      if (backfilledFrames > publishedFrames || attemptedFrames > publishedFrames) {
+        debug("WAL checkpoint exceeds committed frames", { publishedFrames, backfilledFrames, attemptedFrames });
+        throw new Error(BUSY);
+      }
+      if (attemptedFrames > backfilledFrames) debug("replaying WAL after recovery or partial checkpoint", { publishedFrames, backfilledFrames, attemptedFrames });
     }
     const frames: { page: number; offset: number }[] = [];
     let committedFrames = 0;

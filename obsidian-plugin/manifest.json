@@ -1,7 +1,7 @@
 {
   "id": "apple-books-reading-archive",
   "name": "Apple Books Reading Archive",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "minAppVersion": "1.8.0",
   "description": "Sync Apple Books highlights and notes, revisit passages, and explore your reading history on macOS.",
   "author": "luojiedev",

@@ -69,11 +69,10 @@ export function renderBody(snapshot: Snapshot, options = DEFAULT_DOCUMENT_OPTION
     seen.add(annotation.uuid);
     const chapter = annotation.chapter || "未识别章节";
     if (chapter !== previousChapter) { body.push(`## ${inline(chapter)}`, ""); previousChapter = chapter; }
+    else body.push("---", "");
     if (annotation.selectedText?.trim()) body.push(quote(annotation.selectedText), "");
     if (annotation.note?.trim()) body.push("**Apple Books 笔记**", "", quote(annotation.note), "");
     if (!annotation.chapter && annotation.location) body.push(`位置：${inline(annotation.location)}`, "");
-    // Stable block IDs survive changed text, ordering and repeated imports.
-    body.push(`^ab-${digest(snapshot.book.assetId + "\0" + annotation.uuid).slice(0, 24)}`, "");
   }
   if (!annotations.length) body.push("本书目前没有已同步到本机的高亮或笔记。", "");
   return substitute(options.bodyTemplate.replace(/\r\n/g, "\n"), {

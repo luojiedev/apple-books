@@ -2,11 +2,11 @@
 
 插件直接读取本机 Apple Books 的 SQLite 数据库。可以在 Obsidian 内浏览书库、搜索摘录、随机回顾、查看年度报告，并将高亮与笔记同步为 Markdown。业务代码使用 TypeScript，SQLite 的 JavaScript 引擎随 `main.js` 一起发布，无需 Go、外部可执行程序或服务器。
 
-当前版本 **0.3.0**，适用于 **macOS 的 Obsidian 桌面版 1.8.0 及以上**。Apple 芯片和 Intel Mac 使用同一个安装包。移动端、Windows 和 Linux 可以阅读已同步的 Markdown，但不能运行本插件。源数据需先通过 Apple Books 同步到这台 Mac。
+当前版本 **0.3.2**，适用于 **macOS 的 Obsidian 桌面版 1.8.0 及以上**。Apple 芯片和 Intel Mac 使用同一个安装包。移动端、Windows 和 Linux 可以阅读已同步的 Markdown，但不能运行本插件。源数据需先通过 Apple Books 同步到这台 Mac。
 
 ## 安装：不需要 Go、Git 或终端
 
-1. 下载 `apple-books-reading-archive.zip`。本地构建产物在 `dist/obsidian-0.3.0/`。
+1. 下载 `apple-books-reading-archive.zip`。本地构建产物在 `dist/obsidian-0.3.2/`。
 2. 解压，将整个 `apple-books-reading-archive` 文件夹放进你的 Obsidian 仓库下的 `.obsidian/plugins/`。Finder 中可按 `Command + Shift + .` 显示隐藏文件夹。
 3. 在 Obsidian「设置 → 第三方插件」中启用 **Apple Books Reading Archive**；必要时重新启动 Obsidian。
 4. 点击左侧书本图标，进入阅读档案。插件自动发现书库，直接在内存中读取数据。
@@ -23,6 +23,10 @@
 如果提示 macOS 拒绝读取（日志为 `EPERM` 或 `EACCES`），在「系统设置 → 隐私与安全性 → 完全磁盘访问权限」中添加或开启 Obsidian，然后按 `⌘Q` 完全退出再打开。仅关闭窗口或切换标签页不等于重启应用。无需重新同步 Markdown。
 
 如果提示未找到数据库，应先在本机 Apple Books 完成同步；如果使用自定义书库，需同时指定来自同一数据来源的阅读历史数据库路径。插件不会绕过系统权限或仅忽略 WAL 来显示可能过期的时长。
+
+### 持续提示「Apple Books 数据库正在变化」
+
+0.3.1 修复了 WAL 恢复或部分回写后被持续误判为忙碌的问题。SQLite 的 `nBackfillAttempted` 可以大于 `nBackfill`，这个差值不代表仍有写入进行。插件现在校验两个计数均不超过已提交帧数，并在内存中重放全部已提交 WAL；双次读取、校验和与完整性检查保持启用。升级时保留 `data.json` 和已有笔记，再点击重试。若源文件确实仍在变化，仍需等同步结束后重试。
 
 ## 使用
 
@@ -72,7 +76,9 @@
 
 ## 同步规则与个人内容保护
 
-每本书对应一个 Markdown 文件。书籍通过 `assetId` 识别，批注通过 `UUID` 生成稳定块标识。文件名包含书名与书籍标识摘要，同名书不会混写。
+每本书对应一个 Markdown 文件。书籍通过 `assetId` 识别，批注的 `UUID` 仅用于内部校验与排序，摘录正文不再输出 `^ab-…` 块标识。同一章节的摘录之间使用分隔线。文件名包含书名与书籍标识摘要，同名书不会混写。
+
+升级到 0.3.2 后，手动点击一次「同步高亮与笔记」，即可从未被手动修改的自动区域中去掉旧块标识；不需要删除笔记重新导出。存在手动修改时仍通过冲突对比处理。此前指向这些块标识的 Obsidian 块引用会失去目标。
 
 文件中的 `<!-- apple-books:begin ... -->` 到 `<!-- apple-books:end -->` 为自动生成区域。**请把自己的心得写在标记外**，例如默认的「我的读书心得」章节。标记外的正文和个人 frontmatter 属性均保持原样；书籍属性仅在其专用区域内更新。
 
@@ -96,7 +102,7 @@
 - 使用 Node.js 文件系统 API，只读访问 Vault 之外的 Apple Books 书库、批注及阅读历史数据库，原因是这些数据由 Apple Books 保存在 macOS 容器中。为识别章节，还会读取书库记录指向的 EPUB 及其目录文件。
 - 默认数据库位置为 `~/Library/Containers/com.apple.iBooksX/Data/Documents/` 下的 `BKLibrary/` 和 `AEAnnotation/`。阅读历史位于 `~/Library/Group Containers/group.com.apple.iBooks/Documents/BCCloudData-BookDataStoreService/CRDTModelSync-ReadingHistoryModel/CRDTModelSync-ReadingHistoryModel`。
 - 插件以 `r` 模式打开源文件，不写数据库、不创建源目录下的 WAL/SHM、不执行 checkpoint。SQL 仅运行在内存副本上，并启用 `query_only`。
-- 同时读取主数据库、WAL、SHM 和回滚日志。读取前后校验文件状态，并比较两次读取的完整内容；WAL 校验页大小、salt、滚动校验和与提交边界。有 SHM 时仅使用其已发布提交，拒绝进行中的 checkpoint。之后对内存副本运行 SQLite `quick_check`。
+- 同时读取主数据库、WAL、SHM 和回滚日志。读取前后校验文件状态，并比较两次读取的完整内容；WAL 校验页大小、salt、滚动校验和与提交边界。有 SHM 时仅使用其已发布提交，确认回写计数未超过提交边界；恢复或部分回写留下的计数差异不会被误判为忙碌。之后对内存副本运行 SQLite `quick_check`。
 - 这些检查用于发现并发变化，不是 SQLite 原生的加锁备份 API，也不提供多个 Apple Books 数据库之间的原子事务。遇到变化、校验失败或回滚日志时会停止该次读取，保留已有笔记并提示重试。持续失败时请退出 Apple Books，等待后台同步结束；自定义路径应来自一致性备份，不能只复制正在使用的主数据库而丢掉 WAL。
 - 为控制内存占用，单个数据库、WAL 或最终数据库镜像上限为 128 MB；EPUB 文件上限 128 MB，单个目录 XML 上限 2 MB。超限数据库会明确报错，EPUB 超限仅影响章节名称。
 - 当前支持本项目已有的 Apple Books 私有表结构，没有添加其他版本的兼容分支。数据库结构不受支持时会报错，避免将解析失败误当作空书库。
@@ -118,7 +124,7 @@ pnpm package
 
 测试用 Node 内置 SQLite 创建虚构书库，覆盖真实 WAL 提交/回滚与缓存刷新、只读性、数据库损坏、阅读时长、EPUB 章节、自动同步生命周期、增量缓存、模板、书籍属性、差异合并和并发冲突保护；不读取用户的真实 Apple Books 数据。
 
-`.github/workflows/obsidian.yml` 可以手动构建产物。推送 `obsidian-0.3.0` 形式的标签会生成 **Draft Release**，需要维护者检查后发布。现有 Go Web 工具独立保留，不是插件依赖。
+`.github/workflows/obsidian.yml` 可以手动构建产物。推送 `obsidian-0.3.2` 形式的标签会生成 **Draft Release**，需要维护者检查后发布。现有 Go Web 工具独立保留，不是插件依赖。
 
 ## 代码结构
 

@@ -83,6 +83,55 @@ test("WAL replay handles snapshots without shm, repeated page writes, truncation
   } finally { writer.close(); await f.close(); }
 });
 
+test("recovered WAL with attempted backfill remains readable and leaves source files unchanged", async () => {
+  const f = await fixture();
+  const writer = new DatabaseSync(f.settings.annotationDB);
+  const recoveredPath = join(f.directory, "recovered.sqlite");
+  let reader: DatabaseSync | undefined;
+  const SQL = await initSqlJs();
+  try {
+    writer.exec("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; UPDATE ZAEANNOTATION SET ZANNOTATIONNOTE='recovered commit' WHERE Z_PK=1");
+    // A missing shm forces SQLite to rebuild its index from the committed WAL,
+    // just as after recovery. No checkpoint or writer remains active here.
+    await writeFile(recoveredPath, await readFile(f.settings.annotationDB));
+    await writeFile(`${recoveredPath}-wal`, await readFile(`${f.settings.annotationDB}-wal`));
+    reader = new DatabaseSync(recoveredPath, { readOnly: true });
+    const expected = reader.prepare("SELECT ZANNOTATIONNOTE FROM ZAEANNOTATION WHERE Z_PK=1").get()?.ZANNOTATIONNOTE;
+    assert.equal(expected, "recovered commit");
+    const files = [recoveredPath, `${recoveredPath}-wal`, `${recoveredPath}-shm`];
+    const before = await Promise.all(files.map(file => readFile(file)));
+    const shm = before[2]!;
+    assert.equal(shm.readUInt32LE(96), 0);
+    assert.ok(shm.readUInt32LE(128) > 0);
+    assert.equal(shm.readUInt32LE(128), shm.readUInt32LE(16));
+    const snapshot = new SQL.Database(await readSnapshot(recoveredPath));
+    try {
+      assert.equal(snapshot.exec("PRAGMA quick_check")[0]?.values[0]?.[0], "ok");
+      assert.equal(snapshot.exec("SELECT ZANNOTATIONNOTE FROM ZAEANNOTATION WHERE Z_PK=1")[0]?.values[0]?.[0], expected);
+    } finally { snapshot.close(); }
+    assert.deepEqual(await Promise.all(files.map(file => readFile(file))), before);
+  } finally { reader?.close(); writer.close(); await f.close(); }
+});
+
+test("WAL checkpoint progress cannot exceed the published commit boundary", async () => {
+  const f = await fixture();
+  const writer = new DatabaseSync(f.settings.annotationDB);
+  try {
+    writer.exec("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; UPDATE ZAEANNOTATION SET ZANNOTATIONNOTE='committed' WHERE Z_PK=1");
+    const [db, wal, shm] = await Promise.all([f.settings.annotationDB, `${f.settings.annotationDB}-wal`, `${f.settings.annotationDB}-shm`].map(file => readFile(file)));
+    const publishedFrames = shm!.readUInt32LE(16);
+    assert.ok(publishedFrames > 0);
+    for (const offset of [96, 128]) {
+      const invalid = Buffer.from(shm!);
+      invalid.writeUInt32LE(publishedFrames + 1, offset);
+      assert.throws(() => mergeCommittedWal(db!, wal!, invalid), /正在变化/);
+    }
+    const wrongSalt = Buffer.from(wal!);
+    wrongSalt[16] = wrongSalt[16]! ^ 1;
+    assert.throws(() => mergeCommittedWal(db!, wrongSalt, shm!), /校验失败|正在变化/);
+  } finally { writer.close(); await f.close(); }
+});
+
 test("bad schema, journal and missing files fail instead of returning an empty library", async () => {
   const f = await fixture();
   try {

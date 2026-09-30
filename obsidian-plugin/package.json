@@ -1,6 +1,6 @@
 {
   "name": "apple-books-reading-archive",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "private": true,
   "description": "Apple Books reading archive for Obsidian",
   "packageManager": "pnpm@11.10.0",
